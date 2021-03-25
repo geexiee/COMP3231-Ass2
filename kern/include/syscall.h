@@ -40,6 +40,7 @@ struct trapframe; /* from <machine/trapframe.h> */
 
 void syscall(struct trapframe *tf);
 
+int32_t sys_open((userptr_t) filename, uint32_t flags, uint32_t mode, &err);
 /*
  * Support functions.
  */

@@ -114,8 +114,16 @@ syscall(struct trapframe *tf)
                 kprintf("This is expected if your user-level program has finished.\n");
                 panic("Can't continue further until sys_exit() is implemented");
 
-	    /* Add stuff here */
+		case SYS_open:
+			kprintf("trying to call sys_open\n");
+			retval = sys_open((userptr_t)tf->tf_a0, tf->tf_a1, tf->tf_a2, &err);
+			// call sys_open implementation
 
+		case SYS_write:
+			kprintf("trying to call sys_write\n");
+		
+	    /* Add stuff here */
+		
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
 		err = ENOSYS;
