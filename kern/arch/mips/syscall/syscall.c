@@ -116,7 +116,7 @@ syscall(struct trapframe *tf)
 
 		case SYS_open:
 			kprintf("trying to call sys_open\n");
-			retval = sys_open((userptr_t)tf->tf_a0, tf->tf_a1, tf->tf_a2, &err);
+			// err = sys_open((userptr_t)tf->tf_a0, tf->tf_a1, tf->tf_a2, &retval);
 			// call sys_open implementation
 
 		case SYS_write:
