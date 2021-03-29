@@ -19,10 +19,8 @@
 
 // declare global open file table
 void create_open_ft() {
-    //check if there is already an open file table
-    if(open_ft == NULL) {
-        struct of_t *open_ft = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
-    }
+    // only runs if open_ft == NULL;
+    struct of_t *open_ft = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
     // check if memory was allocated
     KASSERT(open_ft != NULL);
 
@@ -31,6 +29,7 @@ void create_open_ft() {
         open_ft[i].fp = 0;
         open_ft[i].vnode = NULL;
     }
+
 
 }
 
@@ -76,6 +75,8 @@ sys_open(userptr_t filename, int flags, mode_t mode)
         - "vnode = vfs_open("file", ...)";
         - should return a vnode
     */
+    struct of_t open_ft[__OPEN_MAX];
+
     int free_fd;
     int free_of;
     int vopen;
@@ -143,7 +144,7 @@ kprintf(rw ? "rw true\n" : "rw false\n");
 
     fd_t[free_fd] = &open_ft[free_of];
 
-    
+
 
     /*
     1. instantiate the open file table(s? both local and global?) (do in a separate function?)
