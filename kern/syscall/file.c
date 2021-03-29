@@ -31,6 +31,7 @@ void create_open_ft() {
         open_ft[i].fp = 0;
         open_ft[i].vnode = NULL;
     }
+
 }
 
 int find_free_of(struct of_t *open_ft) {
@@ -78,14 +79,19 @@ sys_open(userptr_t filename, int flags, mode_t mode)
     int free_fd;
     int free_of;
     int vopen;
-
+    char *kfilename;
+    int err;
 
     struct vnode* vn;
 
-    //check the flag mode
     bool rd = false;
     bool wr = false;
     bool rw = false;
+    // check input if valid
+    if (filename == NULL) {
+        return EFAULT;
+    }
+    //check the flag mode
     switch (flags & O_ACCMODE) {
 	case O_RDONLY:
 		rd = true;
@@ -100,7 +106,9 @@ sys_open(userptr_t filename, int flags, mode_t mode)
         // invalid flag input
 		return EINVAL;
 	};
-
+kprintf(rd ? "rd true\n" : "rd false\n");
+kprintf(wr ? "wr true\n" : "wr false\n");
+kprintf(rw ? "rw true\n" : "rw false\n");
     // initiate new per-process file descriptor -> char *array of size MAX
     struct of_t **fd_t = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
     // initialise to NULL
@@ -108,25 +116,34 @@ sys_open(userptr_t filename, int flags, mode_t mode)
         fd_t[i] = NULL;
     }
 //check    // call helper function to create global open file table
-    if (open_ft == NULL) create_open_ft();
+    if (open_ft == NULL) {
+        create_open_ft();
+    }
 
     // assign free pointer in
     free_fd = find_free_fd(fd_t);
-
     free_of = find_free_of(open_ft);
 
+    // safely copy userspace filename to kernelspace-filename (don't need *done)
+    kfilename = kmalloc(__NAME_MAX);
+    err = copyinstr(filename, kfilename, __NAME_MAX, NULL);
+    if(err != 0) {
+        return err; //returns error code: EFAULT (bad addr) or ENAMETOOLONG
+    }
 
-    // access and store in vnode
-
-    vopen = vfs_open((char *)filename, flags, mode, &vn);
-    if (vopen) {
-        return vopen;
+    // access and store address in vnode
+    vopen = vfs_open(kfilename, flags, mode, &vn);
+    if (vopen < 0) {
+        return ENOENT; //file does not exist
     }
 
     // assign vnode of free Open file table
+    open_ft[free_of].fp = 0;
     open_ft[free_of].vnode = vn;
+
     fd_t[free_fd] = &open_ft[free_of];
 
+    
 
     /*
     1. instantiate the open file table(s? both local and global?) (do in a separate function?)
@@ -164,5 +181,5 @@ sys_open(userptr_t filename, int flags, mode_t mode)
 
 
 
-    return 0;
+    return free_fd;
 }
