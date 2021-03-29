@@ -15,12 +15,24 @@
 #include <syscall.h>
 #include <copyinout.h>
 
+// Initialiser function for per-process fd_table
+void init_fd_table(void) {
+    // initialising the fd_t for this process
+    fd_table = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
+    // initialise each value in the table to NULL
+    for(int i = 0; i < __OPEN_MAX; i++) {
+        fd_table[i] = NULL;
+    }
+    kprintf("\ninitialised per-process fd_t\n");
+    // int free_fd = find_free_fd(fd_t);
+    // kprintf("free fd index is %d\n", free_fd);
+}
+
 // declare global open file table
 void create_open_ft() {
-    //check if there is already an open file table
-    if(open_ft == NULL) {
-        struct of_t *open_ft = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
-    }
+    kprintf("Trying to initialise global of_t\n");
+    // only runs if open_ft == NULL;
+    open_ft = kmalloc(__OPEN_MAX*sizeof(struct of_t));
     // check if memory was allocated
     KASSERT(open_ft != NULL);
 
@@ -29,13 +41,14 @@ void create_open_ft() {
         open_ft[i].fp = 0;
         open_ft[i].vnode = NULL;
     }
+    kprintf("Initialised global of_t\n");
 }
 
 int find_free_of(struct of_t *open_ft) {
     int ret = -1;
     // FD 0,1,2 is reserved for STDIN/STDOUT/STDERR
     for(int i = 3; i < __OPEN_MAX; i++) {
-        if(open_ft->vnode == NULL) {
+        if((open_ft+i)->vnode == NULL) {
             return i;
         }
     }
@@ -73,17 +86,23 @@ sys_open(userptr_t filename, int flags, mode_t mode)
         - "vnode = vfs_open("file", ...)";
         - should return a vnode
     */
-    int free_fd;
+
+    // int free_fd;
     int free_of;
     int vopen;
+    char *kfilename;
+    int err;
 
+    struct vnode **vn = kmalloc(sizeof(struct vnode));
 
-    struct vnode* vn;
-
-    //check the flag mode
     bool rd = false;
     bool wr = false;
     bool rw = false;
+    // check input if valid
+    if (filename == NULL) {
+        return EFAULT;
+    }
+    //check the flag mode
     switch (flags & O_ACCMODE) {
 	case O_RDONLY:
 		rd = true;
@@ -98,32 +117,47 @@ sys_open(userptr_t filename, int flags, mode_t mode)
         // invalid flag input
 		return EINVAL;
 	};
+    kprintf(rd ? "rd true\n" : "rd false\n");
+    kprintf(wr ? "wr true\n" : "wr false\n");
+    kprintf(rw ? "rw true\n" : "rw false\n");
 
-    // initiate new per-process file descriptor -> char *array of size MAX
-    struct of_t **fd_t = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
-    // initialise to NULL
-    for(int i = 0; i < __OPEN_MAX; i++) {
-        fd_t[i] = NULL;
-    }
 //check    // call helper function to create global open file table
-    if (open_ft == NULL) create_open_ft();
+    if (open_ft == NULL) {
+        kprintf("global open file table is null for some reason");
+        create_open_ft();
+    }
 
+    // find free entry in fd table
+    int fd = find_free_fd(fd_table);   
+    kprintf("free fd is %d\n", fd);
+    
     // assign free pointer in
-    free_fd = find_free_fd(fd_t);
-
     free_of = find_free_of(open_ft);
+    kprintf("free of is %d\n", free_of);
 
+    // make the fd point to the of_table
+    fd_table[fd] = &open_ft[free_of];
+    kprintf("assigned fd_t entry no.%d to of_t entry no.%d\n", fd, free_of);
 
-    // access and store in vnode
+    // safely copy userspace filename to kernelspace-filename (don't need *done)
+    kfilename = kmalloc(__NAME_MAX);
+    err = copyinstr(filename, kfilename, __NAME_MAX, NULL);
+    if(err != 0) {
+        return err; //returns error code: EFAULT (bad addr) or ENAMETOOLONG
+    }
 
-    vopen = vfs_open((char *)filename, flags, mode, &vn);
-    if (vopen) {
-        return vopen;
+    // access and store address in vnode
+    vopen = vfs_open(kfilename, flags, mode, vn);
+    if (vopen < 0) {
+        return ENOENT; //file does not exist
     }
 
     // assign vnode of free Open file table
-    open_ft[free_of].vnode = vn;
-    fd_t[free_fd] = &open_ft[free_of];
+    open_ft[free_of].fp = 0;
+    open_ft[free_of].vnode = *vn;
+
+    // fd_t[free_fd] = &open_ft[free_of];
+
 
 
     /*
@@ -162,5 +196,6 @@ sys_open(userptr_t filename, int flags, mode_t mode)
 
 
 
+    // return free_fd;
     return 0;
 }

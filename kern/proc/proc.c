@@ -82,6 +82,9 @@ proc_create(const char *name)
 	/* VFS fields */
 	proc->p_cwd = NULL;
 
+	// Each proc has a file descriptor table, initialise it to null for now
+	proc->fd_t = NULL;
+
 	return proc;
 }
 
