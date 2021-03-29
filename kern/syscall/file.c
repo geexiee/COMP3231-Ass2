@@ -18,4 +18,6 @@
 /*
  * Add your file-related functions here ...
  */
-
+// void init() {
+//     global_fd_t_lock = &lock_create("global_lock");
+// }
