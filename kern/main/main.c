@@ -50,7 +50,6 @@
 #include <test.h>
 #include <version.h>
 #include "autoconf.h"  // for pseudoconfig
-#include <spinlock.h>
 
 
 /*
@@ -76,10 +75,6 @@ static const char harvard_copyright[] =
 /*
  * Initial boot sequence.
  */
-void init();
-void init() {
-    struct lock global_fd_t_lock = lock_create("global_lock");
-}
 static
 void
 boot(void)
@@ -138,7 +133,6 @@ boot(void)
 	vfs_setbootfs("emu0");
 
 	kheap_nextgeneration();
-	init();
 	/*
 	 * Make sure various things aren't screwed up.
 	 */
