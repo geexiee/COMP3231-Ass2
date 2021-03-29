@@ -36,6 +36,7 @@
 #include <current.h>
 #include <syscall.h>
 
+#include <file.h>
 
 /*
  * System call dispatcher.
@@ -82,6 +83,8 @@ syscall(struct trapframe *tf)
 	int32_t retval;
 	int err;
 
+	int result;
+
 	KASSERT(curthread != NULL);
 	KASSERT(curthread->t_curspl == 0);
 	KASSERT(curthread->t_iplhigh_count == 0);
@@ -115,6 +118,15 @@ syscall(struct trapframe *tf)
                 panic("Can't continue further until sys_exit() is implemented");
 
 	    /* Add stuff here */
+
+		//open function here
+		case SYS_open:			// const char,         int,                 mode
+			result = sys_open( (userptr_t)tf->tf_a0, (int)tf->tf_a1, (mode_t)tf->tf_a2 );
+			kprintf("OPEN %d\n", result);
+
+		case SYS_close:
+			kprintf("CLOSE\n");
+
 
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
