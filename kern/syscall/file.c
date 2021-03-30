@@ -121,7 +121,7 @@ sys_open(userptr_t filename, int flags, mode_t mode)
 
 //check    // call helper function to create global open file table
     if (open_ft == NULL) {
-        kprintf("global open file table is null for some reason");
+        kprintf("global open file table is null in the process for some reason");
         create_open_ft();
     }
 

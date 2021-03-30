@@ -29,13 +29,16 @@
 
  */
 
+// The fd_t for the process, an array of pointers to of entries
 #define fd_table (curthread->t_proc->fd_t)
 
+// the open values in the global of_t
 struct of_t {
     off_t fp;
     struct vnode *vnode;
 };
-// array of open files
+
+// array of open files (global ft), initialised in main
 struct of_t *open_ft;
 
 // Initialiser function for per-process fd_table
