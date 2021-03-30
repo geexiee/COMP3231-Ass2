@@ -15,12 +15,22 @@
 #include <syscall.h>
 #include <copyinout.h>
 
-
+// Initialiser function for per-process fd_table
+void init_fd_table(void) {
+    // initialising the fd_t for this process
+    fd_table = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
+    // initialise each value in the table to NULL
+    for(int i = 0; i < __OPEN_MAX; i++) {
+        fd_table[i] = NULL;
+    }
+    kprintf("\ninitialised per-process fd_t\n");
+}
 
 // declare global open file table
 void create_open_ft() {
+    kprintf("Trying to initialise global of_t\n");
     // only runs if open_ft == NULL;
-    struct of_t *open_ft = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
+    open_ft = kmalloc(__OPEN_MAX*sizeof(struct of_t));
     // check if memory was allocated
     KASSERT(open_ft != NULL);
 
@@ -29,15 +39,14 @@ void create_open_ft() {
         open_ft[i].fp = 0;
         open_ft[i].vnode = NULL;
     }
-
-
+    kprintf("Initialised global of_t\n");
 }
 
 int find_free_of(struct of_t *open_ft) {
     int ret = -1;
     // FD 0,1,2 is reserved for STDIN/STDOUT/STDERR
     for(int i = 3; i < __OPEN_MAX; i++) {
-        if(open_ft->vnode == NULL) {
+        if((open_ft+i)->vnode == NULL) {
             return i;
         }
     }
@@ -75,15 +84,15 @@ sys_open(userptr_t filename, int flags, mode_t mode)
         - "vnode = vfs_open("file", ...)";
         - should return a vnode
     */
-    struct of_t open_ft[__OPEN_MAX];
 
-    int free_fd;
+    // int free_fd;
     int free_of;
+    int free_fd;
     int vopen;
     char *kfilename;
     int err;
 
-    struct vnode* vn;
+    struct vnode **vn = kmalloc(sizeof(struct vnode));
 
     bool rd = false;
     bool wr = false;
@@ -107,6 +116,7 @@ sys_open(userptr_t filename, int flags, mode_t mode)
         // invalid flag input
 		return EINVAL;
 	};
+
 kprintf(rd ? "rd true\n" : "rd false\n");
 kprintf(wr ? "wr true\n" : "wr false\n");
 kprintf(rw ? "rw true\n" : "rw false\n");
@@ -117,16 +127,31 @@ kprintf(rw ? "rw true\n" : "rw false\n");
     for(int i = 0; i < __OPEN_MAX; i++) {
         fd_t[i] = NULL;
     }
+
 //check    // call helper function to create global open file table
     if (open_ft == NULL) {
+        kprintf("global open file table is null for some reason");
         create_open_ft();
     }
 
+
+
+
     // assign free pointer in
+    // find free entry in fd table
     free_fd = find_free_fd(fd_t);
+
+kprintf("free fd is %d\n", free_fd);
+
     if(free_fd < 0) {
         return EMFILE; //per-process table is full
     }
+
+    free_of = find_free_of(open_ft);
+
+kprintf("free of is %d\n", free_of);
+kprintf("assigned fd_t entry no.%d to of_t entry no.%d\n", free_fd, free_of);
+
 
     free_of = find_free_of(open_ft);
     if(free_of < 0) {
@@ -140,17 +165,18 @@ kprintf(rw ? "rw true\n" : "rw false\n");
     }
 
     // access and store address in vnode
-    vopen = vfs_open(kfilename, flags, mode, &vn);
+    vopen = vfs_open(kfilename, flags, mode, vn);
     if (vopen < 0) {
         return ENOENT; //file does not exist
     }
+    // make the fd point to the of_table
+    fd_table[free_fd] = &open_ft[free_of];
 
     // assign vnode of free Open file table
     open_ft[free_of].fp = 0;
-    open_ft[free_of].vnode = vn;
+    open_ft[free_of].vnode = *vn;
 
-    fd_t[free_fd] = &open_ft[free_of];
-
+    // fd_t[free_fd] = &open_ft[free_of];
 kprintf("struct addr1: %p\n", fd_t[free_fd]);
 kprintf("struct addr2: %p\n", fd_t[0]);
 

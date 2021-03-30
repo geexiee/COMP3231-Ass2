@@ -29,13 +29,17 @@
 
  */
 
+#define fd_table (curthread->t_proc->fd_t)
+
 struct of_t {
     off_t fp;
     struct vnode *vnode;
 };
-// structure of each container in the open file table. to be initialised later
-extern struct of_t open_ft[];
+// array of open files
+struct of_t *open_ft;
 
+// Initialiser function for per-process fd_table
+void init_fd_table(void);
 // initialise global open file table
 void create_open_ft(void);
 // find free of

@@ -50,6 +50,7 @@
 #include <test.h>
 #include <version.h>
 #include "autoconf.h"  // for pseudoconfig
+#include <file.h>
 
 
 /*
@@ -133,6 +134,9 @@ boot(void)
 	vfs_setbootfs("emu0");
 
 	kheap_nextgeneration();
+
+    // Create open file when sys161 starts >>
+    create_open_ft();
 
 	/*
 	 * Make sure various things aren't screwed up.
