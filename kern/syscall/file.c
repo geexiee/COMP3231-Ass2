@@ -87,6 +87,7 @@ sys_open(userptr_t filename, int flags, mode_t mode)
 
     // int free_fd;
     int free_of;
+    int free_fd;
     int vopen;
     char *kfilename;
     int err;
@@ -115,9 +116,17 @@ sys_open(userptr_t filename, int flags, mode_t mode)
         // invalid flag input
 		return EINVAL;
 	};
-    kprintf(rd ? "rd true\n" : "rd false\n");
-    kprintf(wr ? "wr true\n" : "wr false\n");
-    kprintf(rw ? "rw true\n" : "rw false\n");
+
+kprintf(rd ? "rd true\n" : "rd false\n");
+kprintf(wr ? "wr true\n" : "wr false\n");
+kprintf(rw ? "rw true\n" : "rw false\n");
+
+    // initiate new per-process file descriptor -> char *array of size MAX
+    struct of_t **fd_t = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
+    // initialise to NULL
+    for(int i = 0; i < __OPEN_MAX; i++) {
+        fd_t[i] = NULL;
+    }
 
 //check    // call helper function to create global open file table
     if (open_ft == NULL) {
@@ -125,18 +134,29 @@ sys_open(userptr_t filename, int flags, mode_t mode)
         create_open_ft();
     }
 
-    // find free entry in fd table
-    int fd = find_free_fd(fd_table);   
-    kprintf("free fd is %d\n", fd);
-    
+
+
+
     // assign free pointer in
+    // find free entry in fd table
+    free_fd = find_free_fd(fd_t);
+
+kprintf("free fd is %d\n", free_fd);
+
+    if(free_fd < 0) {
+        return EMFILE; //per-process table is full
+    }
+
     free_of = find_free_of(open_ft);
-    kprintf("free of is %d\n", free_of);
 
-    // make the fd point to the of_table
-    fd_table[fd] = &open_ft[free_of];
-    kprintf("assigned fd_t entry no.%d to of_t entry no.%d\n", fd, free_of);
+kprintf("free of is %d\n", free_of);
+kprintf("assigned fd_t entry no.%d to of_t entry no.%d\n", free_fd, free_of);
 
+
+    free_of = find_free_of(open_ft);
+    if(free_of < 0) {
+        return ENFILE; //global-open file table is full
+    }
     // safely copy userspace filename to kernelspace-filename (don't need *done)
     kfilename = kmalloc(__NAME_MAX);
     err = copyinstr(filename, kfilename, __NAME_MAX, NULL);
@@ -149,13 +169,16 @@ sys_open(userptr_t filename, int flags, mode_t mode)
     if (vopen < 0) {
         return ENOENT; //file does not exist
     }
+    // make the fd point to the of_table
+    fd_table[free_fd] = &open_ft[free_of];
 
     // assign vnode of free Open file table
     open_ft[free_of].fp = 0;
     open_ft[free_of].vnode = *vn;
 
     // fd_t[free_fd] = &open_ft[free_of];
-
+kprintf("struct addr1: %p\n", fd_t[free_fd]);
+kprintf("struct addr2: %p\n", fd_t[0]);
 
 
     /*
@@ -194,6 +217,5 @@ sys_open(userptr_t filename, int flags, mode_t mode)
 
 
 
-    // return free_fd;
-    return 0;
+    return free_fd;
 }
