@@ -110,6 +110,7 @@ sys_open(userptr_t filename, int flags, mode_t mode)
 kprintf(rd ? "rd true\n" : "rd false\n");
 kprintf(wr ? "wr true\n" : "wr false\n");
 kprintf(rw ? "rw true\n" : "rw false\n");
+
     // initiate new per-process file descriptor -> char *array of size MAX
     struct of_t **fd_t = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
     // initialise to NULL
@@ -123,8 +124,14 @@ kprintf(rw ? "rw true\n" : "rw false\n");
 
     // assign free pointer in
     free_fd = find_free_fd(fd_t);
-    free_of = find_free_of(open_ft);
+    if(free_fd < 0) {
+        return EMFILE; //per-process table is full
+    }
 
+    free_of = find_free_of(open_ft);
+    if(free_of < 0) {
+        return ENFILE; //global-open file table is full
+    }
     // safely copy userspace filename to kernelspace-filename (don't need *done)
     kfilename = kmalloc(__NAME_MAX);
     err = copyinstr(filename, kfilename, __NAME_MAX, NULL);
@@ -144,6 +151,8 @@ kprintf(rw ? "rw true\n" : "rw false\n");
 
     fd_t[free_fd] = &open_ft[free_of];
 
+kprintf("struct addr1: %p\n", fd_t[free_fd]);
+kprintf("struct addr2: %p\n", fd_t[0]);
 
 
     /*
