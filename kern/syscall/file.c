@@ -24,8 +24,6 @@ void init_fd_table(void) {
         fd_table[i] = NULL;
     }
     kprintf("\ninitialised per-process fd_t\n");
-    // int free_fd = find_free_fd(fd_t);
-    // kprintf("free fd index is %d\n", free_fd);
 }
 
 // declare global open file table
