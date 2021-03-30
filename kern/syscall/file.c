@@ -53,12 +53,12 @@ int find_free_of(struct of_t *open_ft) {
     return ret;
 }
 
-int find_free_fd(struct of_t **fd_t) {
+int find_free_fd(struct of_t **fd_table) {
 
     int ret = -1;
     // FD 0,1,2 is reserved for STDIN/STDOUT/STDERR
     for(int i = 3; i < __OPEN_MAX; i++) {
-        if(fd_t[i] == NULL) {
+        if(fd_table[i] == NULL) {
             return i;
         }
     }
@@ -73,19 +73,16 @@ sys_open(userptr_t filename, int flags, mode_t mode)
     /*
     PSEUDO
     0. check flag mode
-    1. Create Array for the process. -initiate to Null
-    2. Initiate global array of fd in global or separate function? -initiate to Null
-    3. Initiate file descriptor
-    4. Have a find free file descriptor
-    5. assign free file descriptor to point to an filepointer incrementor
-    6.
+    1. find free file descriptor
+    2. assign free file descriptor to point to an open file in the of_t
+    3. initialise vavlues in the openfile entry
+    4. call vfs_open
     7. Linking the vnode
         - Pass in the filename into VOP to get a vnode
         - "vnode = vfs_open("file", ...)";
         - should return a vnode
     */
 
-    // int free_fd;
     int free_of;
     int free_fd;
     int vopen;
@@ -117,7 +114,6 @@ sys_open(userptr_t filename, int flags, mode_t mode)
 
 kprintf("flag is: %d (0 = rd, 1 = wr, 2 = rdwr) \n", flag);
 
-    // assign free pointer in
     // find free entry in fd table
     free_fd = find_free_fd(fd_table);
 
@@ -137,6 +133,7 @@ kprintf("assigned fd_t entry no.%d to of_t entry no.%d\n", free_fd, free_of);
     if(free_of < 0) {
         return ENFILE; //global-open file table is full
     }
+
     // safely copy userspace filename to kernelspace-filename (don't need *done)
     kfilename = kmalloc(__NAME_MAX);
     err = copyinstr(filename, kfilename, __NAME_MAX, NULL);
@@ -161,42 +158,59 @@ kprintf("assigned fd_t entry no.%d to of_t entry no.%d\n", free_fd, free_of);
 kprintf("struct addr1: %p\n", fd_table[free_fd]);
 kprintf("struct addr2: %p\n", fd_table[0]);
 
-
-    /*
-    1. instantiate the open file table(s? both local and global?) (do in a separate function?)
-    2. assign an entry in the local OFT to this call (fd is an index in the local OFT)
-        a. might need to leave out 0,1,2?
-    3. have that entry point to a struct in the global OFT which contains a file pointer
-    and an unassigned vnode
-        a. may need to instantiate the struct manually and
-        give it an appropriate file pointer and empty vnode? (to be instantiated in vfs_open)
-    4. use ACC_MODE mask to check with flags to determine the operation mode (to put into VFS_open)
-    5. call VFS_open using the pathname, flags, mode, and retval(vnode which was
-    just created in the global OFT).
-        a. when accessing the vnode through the struct in the global OFT,
-        use a lock for synchronisation
-        b. calling this should instantiate the vnode so that it corresponds to the
-        file we're trying to open (according to the flags)
-    6. if VFS_open returns 0, the vnode was instantiated successfully
-    7. release the lock
-    8. free memory -> in sys_close
-    */
-
-    //WHAT DO I NEED to create?
-    /*
-    1. input arguments, what need to be passed in?
-    2. Checks:
-        - check if arguments passed in is not NULL
-        - check if file exists in system
-        -
-    3. Handler:
-        - Read, Write, APPEND Etc. (In the manual)
-        - Error handling
-        - Assign file handle (return int)
-        - create process open_file_table
-    */
-
-
-
     return free_fd;
 }
+
+
+// // sys_read
+// ssize_t sys_read(int fd, void *buf, size_t buflen) {
+//     struct of_t *of = fd_table[fd];
+//     off_t fp = -1;
+//     int flag = -1;
+//     struct vnode *vn = NULL;
+
+
+//     if (of == NULL) {
+//         return EBADF;
+//     } else {
+//         int flag = of->flag;
+//         vn = of->vnode;
+//         fp = of->fp;
+//     }
+
+//     if (flag != rdwr && flag != rd) {
+//         return EBADF;
+//     }
+
+//     if (buf == NULL) {
+//         return EFAULT;
+//     }
+
+//     // create uio 
+//     // create iovec
+//     // init both using uio_kinit
+//     // pass uio block in vop_read
+
+//     struct addrspace as = as_create();
+//     struct iovec curr_iovec = 
+//     struct uio curr_uio = kmalloc(sizeof(struct uio));
+
+//     int ret = vn->vn_ops->vop_read(vn, )    
+
+//     return 0;
+    
+//         error checking:
+//         a. not valid fd
+//         b. buf is invalid
+//         c. hardware error
+
+//         0. get the vnode from the fd 
+//             a. traverse through the fd_t and of_t
+//         1. vop read that shit
+//         2. move the offset by the number of bytes
+//         3. return count of bytes
+    
+   
+
+
+// }

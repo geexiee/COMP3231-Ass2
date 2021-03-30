@@ -117,7 +117,6 @@ syscall(struct trapframe *tf)
                 kprintf("This is expected if your user-level program has finished.\n");
                 panic("Can't continue further until sys_exit() is implemented");
 
-	    /* Add stuff here */
 
 		//open function here
 		case SYS_open:			// const char,         int,                 mode
