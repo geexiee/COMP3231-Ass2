@@ -32,8 +32,9 @@
 // The fd_t for the process, an array of pointers to of entries
 #define fd_table (curthread->t_proc->fd_t)
 
-// the open values in the global of_t
+// the values in the global of_t
 struct of_t {
+    int flag; // keep track of if its rd(0) wr(1) or rdwr(2)
     off_t fp;
     struct vnode *vnode;
 };

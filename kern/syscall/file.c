@@ -91,12 +91,10 @@ sys_open(userptr_t filename, int flags, mode_t mode)
     int vopen;
     char *kfilename;
     int err;
+    int flag = -1;   // keep track of the open flag
 
     struct vnode **vn = kmalloc(sizeof(struct vnode));
 
-    bool rd = false;
-    bool wr = false;
-    bool rw = false;
     // check input if valid
     if (filename == NULL) {
         return EFAULT;
@@ -104,42 +102,24 @@ sys_open(userptr_t filename, int flags, mode_t mode)
     //check the flag mode
     switch (flags & O_ACCMODE) {
 	case O_RDONLY:
-		rd = true;
+		flag = rd;
 		break;
 	case O_WRONLY:
-		wr = true;
+		flag = wr;
 		break;
 	case O_RDWR:
-		rw = true;
+        flag = rdwr;
 		break;
 	default:
         // invalid flag input
 		return EINVAL;
 	};
 
-kprintf(rd ? "rd true\n" : "rd false\n");
-kprintf(wr ? "wr true\n" : "wr false\n");
-kprintf(rw ? "rw true\n" : "rw false\n");
-
-    // initiate new per-process file descriptor -> char *array of size MAX
-    struct of_t **fd_t = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
-    // initialise to NULL
-    for(int i = 0; i < __OPEN_MAX; i++) {
-        fd_t[i] = NULL;
-    }
-
-//check    // call helper function to create global open file table
-    if (open_ft == NULL) {
-        kprintf("global open file table is null in the process for some reason");
-        create_open_ft();
-    }
-
-
-
+kprintf("flag is: %d (0 = rd, 1 = wr, 2 = rdwr) \n", flag);
 
     // assign free pointer in
     // find free entry in fd table
-    free_fd = find_free_fd(fd_t);
+    free_fd = find_free_fd(fd_table);
 
 kprintf("free fd is %d\n", free_fd);
 
@@ -169,16 +149,17 @@ kprintf("assigned fd_t entry no.%d to of_t entry no.%d\n", free_fd, free_of);
     if (vopen < 0) {
         return ENOENT; //file does not exist
     }
-    // make the fd point to the of_table
-    fd_table[free_fd] = &open_ft[free_of];
 
-    // assign vnode of free Open file table
+
+    // assign values to the corresponding of_t entry
     open_ft[free_of].fp = 0;
     open_ft[free_of].vnode = *vn;
-
-    // fd_t[free_fd] = &open_ft[free_of];
-kprintf("struct addr1: %p\n", fd_t[free_fd]);
-kprintf("struct addr2: %p\n", fd_t[0]);
+    open_ft[free_of].flag = flag;
+    
+    // make the fd point to the of_table
+    fd_table[free_fd] = &open_ft[free_of];
+kprintf("struct addr1: %p\n", fd_table[free_fd]);
+kprintf("struct addr2: %p\n", fd_table[0]);
 
 
     /*

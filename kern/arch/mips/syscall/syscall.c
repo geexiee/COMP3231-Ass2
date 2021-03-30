@@ -124,7 +124,7 @@ syscall(struct trapframe *tf)
 			result = sys_open( (userptr_t)tf->tf_a0, (int)tf->tf_a1, (mode_t)tf->tf_a2 );
 kprintf("OPEN %d\n", result);
 			result = sys_open( (userptr_t)tf->tf_a0, (int)tf->tf_a1, (mode_t)tf->tf_a2 );
-kprintf("OPEN2 %d\n", result);
+kprintf("SECOND OPEN %d\n", result);
 
 
 		case SYS_close:
