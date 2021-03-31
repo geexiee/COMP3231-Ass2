@@ -247,7 +247,7 @@ sys_close(int fd, int *err) {
     int ret = 0;
     if (fd_table[fd] == NULL) {
         *err = EBADF; // if fd is not a valid file handle
-        return 1;
+        return -1;
     }
 
     struct of_t *curr = fd_table[fd];
@@ -271,7 +271,7 @@ sys_close(int fd, int *err) {
 }
 
 int
-sys_dup2(int oldfd, int newfd, int *err) {
+sys_dup2(int oldfd, int newfd, int *err) {  // WORKING FOR 2 OPEN FILES, STILL NEED TO TEST WITH CLOSED FILE
 
 //LOCK
 //check if valid file directories
@@ -284,18 +284,21 @@ kprintf("OLD->%d and NEW->%d are VALID FDs\n" ,oldfd, newfd);
 
     // check if dup2 calls pass in the same fd
     if(oldfd == newfd) {
+        kprintf("old fd = new fd\n");
         return oldfd;
     }
     // if new fd is open, then close it
     if(fd_table[newfd] != NULL) {
         if( (sys_close(newfd, err)) ) {
 //UNLOCK    
+            kprintf("couldn't close\n");
 /*ERROR*/   return  -1; // could not free file if not null
         }
     }
     // Assign the newfd the pointer to the struct holding the vnode and file pointer
     fd_table[newfd] = fd_table[oldfd];
 //UNLOCK
+    kprintf("new fd addr: %p old fd addr: %p\n", fd_table[newfd], fd_table[oldfd]);
     return newfd;
 }
 

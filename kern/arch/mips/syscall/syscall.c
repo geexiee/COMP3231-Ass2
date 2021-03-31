@@ -121,7 +121,6 @@ syscall(struct trapframe *tf)
 		//open function here
 		case SYS_open:			// const char,         int,                 mode
 			retval = sys_open( (userptr_t)tf->tf_a0, (int)tf->tf_a1, (mode_t)tf->tf_a2, &err );
-// kprintf("OPEN %d err value is: %d\n", retval, err);
 			break;
 
 
