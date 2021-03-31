@@ -15,6 +15,7 @@
 #include <syscall.h>
 #include <copyinout.h>
 
+
 // Initialiser function for per-process fd_table
 void init_fd_table(void) {
     // initialising the fd_t for this process
@@ -303,58 +304,79 @@ kprintf("OLD->%d and NEW->%d are VALID FDs\n" ,oldfd, newfd);
 }
 
 
-// off_t
-// sys_lseek(int fd, off_t offset, int whence, int *err) {
+off_t
+sys_lseek(int fd, off_t offset, int whence, int *err) {
 
-//     /* PSEUDO
-//     checks:
-//     1. load in file, check if valid
-//     2. check if you have seek permissions -> VOP_ISSEEKABLE
-//     3. check flags valid -> fail otherwise
-//     3. --
-//     4. based on flag we increment offset
-//     5. if flag is seek_end start from end VOP_SEEKEND
-//     6. check if negative position (EINVAL
-//     */
-//     off_t newpos = 0;
-//     off_t oldpos = 0;
-// //lock
-//     // load in file, check if valid
-//     if(fd_table[fd] == NULL) {
-//         *err = EBADF;
-//         return -1;
-//     }
+    /* PSEUDO
+    checks:
+    1. load in file, check if valid
+    2. check if you have seek permissions -> VOP_ISSEEKABLE
+    3. check flags valid -> fail otherwise
+    3. --
+    4. based on flag we increment offset
+    5. if flag is seek_end start from end VOP_SEEKEND
+    6. check if negative position (EINVAL
+    */
 
-// //unlock
+    // position holders for old and new offset
+    off_t newpos = 0;
+    off_t oldpos = 0;
 
-//     // check when flags
-//     switch (whence) {
-//         case SEEK_SET:
-//         case SEEK_CUR:
-//         case SEEK_END:
-//             break;
-//         default:
-//             *err = EINVAL;
-//             return -1;
-//     }
-//     struct of_t *curr = fd_table[fd];
+    // check whence flag valid SEEK_SET, SEEK_CUR, SEEK_END
+    switch (whence) {
+        case SEEK_SET:
+        case SEEK_CUR:
+        case SEEK_END:
+            break;
+        default:
+            *err = EINVAL;
+            return -1;
+    }
 
+//lock
+    // load in file, check if valid
+    if(fd_table[fd] == NULL) {
+        *err = EBADF;
+//unlock
+        return -1;
+    }
+//unlock
+    struct of_t *curr = fd_table[fd];
 
-//     // check if VOP_ISSEEKABLE, returns <0
-//     int isseek = VOP_ISSEEKABLE(curr->vnode);
-//     if(isseek < 0) {
-//         *err = ESPIPE; // object does not support seeking
+    // check if VOP_ISSEEKABLE, returns <0
+    int isseek = VOP_ISSEEKABLE(curr->vnode);
+    if(isseek < 0) {
+        *err = ESPIPE; // object does not support seeking
+//unlock
+        return -1;
+    }
+    // set position
+    newpos = curr->fp;
+    oldpos = curr->fp;
 
-//     }
-//     // check when flags
-//     switch (whence) {
-//         case SEEK_SET:
-//         case SEEK_CUR:
-//         case SEEK_END:
-//             break;
-//         default:
-//             *err = EINVAL;
-//             return -1;
-//     }
+    struct stat *s = NULL;
 
-// }
+    // flags checked, has to be one of the 3
+    switch (whence) {
+        case SEEK_SET:
+            newpos = offset;
+        case SEEK_CUR:
+            newpos = oldpos + offset;
+        case SEEK_END:
+            //USE VOP_STAT to return file size, t(basically end offset of file)
+            VOP_STAT(curr->vnode, s);
+            newpos = s->st_size + offset;
+
+            break;
+        default:
+            *err = EINVAL;
+            return -1;
+    }
+//unlock
+    // check if newpos is referencing negative
+    if(newpos < 0) {
+        *err = EINVAL;
+        return -1;
+    }
+    return newpos;
+}
