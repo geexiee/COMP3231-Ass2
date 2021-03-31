@@ -81,9 +81,9 @@ syscall(struct trapframe *tf)
 {
 	int callno;
 	int32_t retval;
-	int err;
+	int err = 0;
 
-	int result;
+	// int result;
 
 	KASSERT(curthread != NULL);
 	KASSERT(curthread->t_curspl == 0);
@@ -113,27 +113,36 @@ syscall(struct trapframe *tf)
 		break;
 
         case SYS__exit:
-                kprintf("exit() was called, but it's unimplemented.\n");
-                kprintf("This is expected if your user-level program has finished.\n");
-                panic("Can't continue further until sys_exit() is implemented");
+			kprintf("exit() was called, but it's unimplemented.\n");
+			kprintf("This is expected if your user-level program has finished.\n");
+			panic("Can't continue further until sys_exit() is implemented");
 
 
 		//open function here
 		case SYS_open:			// const char,         int,                 mode
-			result = sys_open( (userptr_t)tf->tf_a0, (int)tf->tf_a1, (mode_t)tf->tf_a2 );
-kprintf("OPEN %d\n", result);
-			result = sys_open( (userptr_t)tf->tf_a0, (int)tf->tf_a1, (mode_t)tf->tf_a2 );
-kprintf("SECOND OPEN %d\n", result);
+			retval = sys_open( (userptr_t)tf->tf_a0, (int)tf->tf_a1, (mode_t)tf->tf_a2, &err );
+// kprintf("OPEN %d err value is: %d\n", retval, err);
+			break;
 
 
-		case SYS_close:
-kprintf("CLOSE\n");
+// 		case SYS_close:
+// kprintf("CLOSE\n");
+// 			err = 0;
+// 			break;
 
+		case SYS_read:
+			// kprintf("CALLING READ\n");
+			retval = sys_read((int)tf->tf_a0, (void *)tf->tf_a1, (size_t)tf->tf_a2, &err);
+			break;
+		
+		case SYS_write:
+			// kprintf("calling syswrite\n");
+			retval = sys_write((int)tf->tf_a0, (void *)tf->tf_a1, (size_t)tf->tf_a2, &err);
+			break;
 
 	    default:
-		kprintf("Unknown syscall %d\n", callno);
-		err = ENOSYS;
-		break;
+			kprintf("Unknown syscall %d\n", callno);
+			break;
 	}
 
 
@@ -143,11 +152,13 @@ kprintf("CLOSE\n");
 		 * userlevel to a return value of -1 and the error
 		 * code in errno.
 		 */
+		kprintf("there was an error in the call, errno: %d\n", err);
 		tf->tf_v0 = err;
 		tf->tf_a3 = 1;      /* signal an error */
 	}
 	else {
 		/* Success. */
+		// kprintf("call was successful\n");
 		tf->tf_v0 = retval;
 		tf->tf_a3 = 0;      /* signal no error */
 	}

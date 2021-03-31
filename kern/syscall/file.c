@@ -20,9 +20,22 @@ void init_fd_table(void) {
     // initialising the fd_t for this process
     fd_table = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
     // initialise each value in the table to NULL
-    for(int i = 0; i < __OPEN_MAX; i++) {
+    for(int i = 3; i < __OPEN_MAX; i++) {
         fd_table[i] = NULL;
     }
+
+    char c1[] = "con:";
+    int free_vnode_index = find_free_of(open_ft);
+    struct vnode **vn = &open_ft[free_vnode_index].vnode;
+    vfs_open(c1, O_WRONLY, 0, vn);
+    
+    char c2[] = "con:";
+    int free_vnode_index2 = find_free_of(open_ft);
+    struct vnode **vn2 = &open_ft[free_vnode_index2].vnode;
+    vfs_open(c2, O_WRONLY, 0, vn2);
+    
+    fd_table[1] = &open_ft[free_vnode_index];
+    fd_table[2] = &open_ft[free_vnode_index];
     kprintf("\ninitialised per-process fd_t\n");
 }
 
@@ -53,12 +66,11 @@ int find_free_of(struct of_t *open_ft) {
     return ret;
 }
 
-int find_free_fd(struct of_t **fd_table) {
-
+int find_free_fd(struct of_t **fd_t) {
     int ret = -1;
     // FD 0,1,2 is reserved for STDIN/STDOUT/STDERR
     for(int i = 3; i < __OPEN_MAX; i++) {
-        if(fd_table[i] == NULL) {
+        if(fd_t[i] == NULL) {
             return i;
         }
     }
@@ -68,33 +80,20 @@ int find_free_fd(struct of_t **fd_table) {
 
 //Basic structure of syscall
 int
-sys_open(userptr_t filename, int flags, mode_t mode)
+sys_open(userptr_t filename, int flags, mode_t mode, int *err)
 {
-    /*
-    PSEUDO
-    0. check flag mode
-    1. find free file descriptor
-    2. assign free file descriptor to point to an open file in the of_t
-    3. initialise vavlues in the openfile entry
-    4. call vfs_open
-    7. Linking the vnode
-        - Pass in the filename into VOP to get a vnode
-        - "vnode = vfs_open("file", ...)";
-        - should return a vnode
-    */
-
     int free_of;
     int free_fd;
     int vopen;
     char *kfilename;
-    int err;
     int flag = -1;   // keep track of the open flag
 
     struct vnode **vn = kmalloc(sizeof(struct vnode));
 
     // check input if valid
     if (filename == NULL) {
-        return EFAULT;
+        *err = EFAULT;
+        return -1;
     }
     //check the flag mode
     switch (flags & O_ACCMODE) {
@@ -109,42 +108,39 @@ sys_open(userptr_t filename, int flags, mode_t mode)
 		break;
 	default:
         // invalid flag input
-		return EINVAL;
+		*err = EINVAL;
+        return -1;
 	};
-
-kprintf("flag is: %d (0 = rd, 1 = wr, 2 = rdwr) \n", flag);
 
     // find free entry in fd table
     free_fd = find_free_fd(fd_table);
 
-kprintf("free fd is %d\n", free_fd);
-
     if(free_fd < 0) {
-        return EMFILE; //per-process table is full
+        *err = EMFILE;
+        return -1; //per-process table is full
     }
 
     free_of = find_free_of(open_ft);
-
-kprintf("free of is %d\n", free_of);
-kprintf("assigned fd_t entry no.%d to of_t entry no.%d\n", free_fd, free_of);
 
 
     free_of = find_free_of(open_ft);
     if(free_of < 0) {
-        return ENFILE; //global-open file table is full
+        *err = ENFILE;
+        return -1; //global-open file table is full
     }
 
     // safely copy userspace filename to kernelspace-filename (don't need *done)
     kfilename = kmalloc(__NAME_MAX);
-    err = copyinstr(filename, kfilename, __NAME_MAX, NULL);
-    if(err != 0) {
-        return err; //returns error code: EFAULT (bad addr) or ENAMETOOLONG
+    *err = copyinstr(filename, kfilename, __NAME_MAX, NULL);
+    if(*err != 0) {
+        return -1; //returns error code: EFAULT (bad addr) or ENAMETOOLONG
     }
 
     // access and store address in vnode
     vopen = vfs_open(kfilename, flags, mode, vn);
     if (vopen < 0) {
-        return ENOENT; //file does not exist
+        *err = ENOENT;
+        return -1; //file does not exist
     }
 
 
@@ -155,62 +151,89 @@ kprintf("assigned fd_t entry no.%d to of_t entry no.%d\n", free_fd, free_of);
     
     // make the fd point to the of_table
     fd_table[free_fd] = &open_ft[free_of];
-kprintf("struct addr1: %p\n", fd_table[free_fd]);
-kprintf("struct addr2: %p\n", fd_table[0]);
 
     return free_fd;
 }
 
 
-// // sys_read
-// ssize_t sys_read(int fd, void *buf, size_t buflen) {
-//     struct of_t *of = fd_table[fd];
-//     off_t fp = -1;
-//     int flag = -1;
-//     struct vnode *vn = NULL;
+// sys_read
+ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
+    struct of_t *of = fd_table[fd];
+    off_t fp = -1;
+    int flag = -1;
+    struct vnode *vn = NULL;
 
+    if (of == NULL) {
+        *err = EBADF;
+        return -1;
+    } else {
+        flag = of->flag;
+        vn = of->vnode;
+        fp = of->fp;
+    }
 
-//     if (of == NULL) {
-//         return EBADF;
-//     } else {
-//         int flag = of->flag;
-//         vn = of->vnode;
-//         fp = of->fp;
-//     }
+    if (flag != rdwr && flag != rd) {
+        *err = EBADF;
+        return -1;
+    }
 
-//     if (flag != rdwr && flag != rd) {
-//         return EBADF;
-//     }
+    if (buf == NULL) {
+        *err = EFAULT;
+        return -1;
+    }
 
-//     if (buf == NULL) {
-//         return EFAULT;
-//     }
+    struct iovec iov;
+    struct uio u;
 
-//     // create uio 
-//     // create iovec
-//     // init both using uio_kinit
-//     // pass uio block in vop_read
+    uio_kinit(&iov, &u, buf, buflen, fp, UIO_READ); // initialising the iovec and uio to use in vop_read
 
-//     struct addrspace as = as_create();
-//     struct iovec curr_iovec = 
-//     struct uio curr_uio = kmalloc(sizeof(struct uio));
+    int result = VOP_READ(vn, &u);
+    if (result != 0) {
+        kprintf("fucked up the vop_read");
+        *err = result;
+        return -1;
+    } 
+    ssize_t bytes_read = buflen - u.uio_resid;
+    of->fp = bytes_read;
 
-//     int ret = vn->vn_ops->vop_read(vn, )    
+    return bytes_read;
+}
 
-//     return 0;
+// sys write
+ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err) {
+    struct of_t *of = fd_table[fd];
+    off_t fp = -1;
+    struct vnode *vn = NULL;
+
+    if (of == NULL) {
+        kprintf("of = NULL, fd is %d\n", fd);
+        *err = EBADF;
+        return -1;
+    } else {
+        vn = of->vnode;
+        fp = of->fp;
+    }
+
+    if (buf == NULL) {
+        kprintf("buffer we're writing from is null\n");
+        *err = EFAULT;
+        return -1;
+    }
+
+    struct iovec iov;
+    struct uio u;
+
+    uio_kinit(&iov, &u, buf, nbytes, fp, UIO_WRITE); // initialising the iovec and uio to use in vop_read
     
-//         error checking:
-//         a. not valid fd
-//         b. buf is invalid
-//         c. hardware error
+    int result = VOP_WRITE(vn, &u);
+    if (result != 0) {
+        *err = result;
+        kprintf("fucked up the vop_write\n");
+        return -1;
+    } 
 
-//         0. get the vnode from the fd 
-//             a. traverse through the fd_t and of_t
-//         1. vop read that shit
-//         2. move the offset by the number of bytes
-//         3. return count of bytes
-    
-   
+    int bytes_written = nbytes - u.uio_resid;
+    of->fp = bytes_written;
 
-
-// }
+    return bytes_written;
+}

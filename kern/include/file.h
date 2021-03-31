@@ -51,9 +51,8 @@ int find_free_of(struct of_t *open_ft);
 // find free int fd in per-process fd
 int find_free_fd(struct of_t **fd_t);
 // implement sys_open
-int sys_open(userptr_t filename, int flags, mode_t mode);
-// ssize_t sys_read(int fd, void *buf, size_t buflen);
-
-
+int sys_open(userptr_t filename, int flags, mode_t mode, int *err);
+ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err);
+ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err); 
 
 #endif /* _FILE_H_ */
