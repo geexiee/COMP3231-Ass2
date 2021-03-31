@@ -129,7 +129,7 @@ syscall(struct trapframe *tf)
 			break;
 
 		case SYS_read:
-			// kprintf("CALLING READ\n");
+			kprintf("CALLING READ\n");
 			retval = sys_read((int)tf->tf_a0, (void *)tf->tf_a1, (size_t)tf->tf_a2, &err);
 			break;
 
