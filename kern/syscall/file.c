@@ -171,7 +171,15 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
     off_t fp = -1;
     int flag = -1;
     struct vnode *vn = NULL;
-
+//lock
+    // struct stat *s = kmalloc(sizeof(struct stat));
+    // VOP_STAT(of->vnode, s);
+    // if( ((long int)of->fp + (long int)buflen) >= s->st_size) {
+    //     *err = EFAULT;
+    //     return -1;
+    // }
+    // kfree(s);
+//unlock
     if (of == NULL) {
         *err = EBADF;
         return -1;
@@ -198,10 +206,10 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
 
     int result = VOP_READ(vn, &u);
     if (result != 0) {
-        kprintf("fucked up the vop_read");
         *err = result;
         return -1;
     }
+
     ssize_t bytes_read = buflen - u.uio_resid;
     of->fp = bytes_read;
 
@@ -319,7 +327,6 @@ kprintf("OLD->%d and NEW->%d are VALID FDs\n" ,oldfd, newfd);
 
 off_t
 sys_lseek(int fd, off_t offset, int whence, int *err) {
-    kprintf("lseek start\n");
     /* PSEUDO
     checks:
     1. load in file, check if valid
@@ -343,7 +350,6 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
             break;
         default:
             *err = EINVAL;
-            kprintf("one\n");
             return -1;
     }
 
@@ -351,7 +357,6 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     // load in file, check if valid
     if(fd_table[fd] == NULL) {
         *err = EBADF;
-        kprintf("two\n");
 
 //unlock
         return -1;
@@ -364,7 +369,6 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     if(isseek < 0) {
         *err = ESPIPE; // object does not support seeking
 //unlock
-        kprintf("three\n");
         return -1;
     }
     // set position
@@ -389,7 +393,6 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
             break;
         default:
             *err = EINVAL;
-            kprintf("five\n");
             return -1;
     }
     //set new offset into table!
@@ -400,10 +403,7 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     // check if newpos is referencing negative
     if(newpos < 0) {
         *err = EINVAL;
-        kprintf("six\n");
        return -1;
     }
-    kprintf("seven\n");
-    kprintf("newpos: %lld\n", newpos);
     return newpos;
 }
