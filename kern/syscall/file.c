@@ -354,7 +354,7 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     newpos = curr->fp;
     oldpos = curr->fp;
 
-    struct stat *s = NULL;
+    struct stat *s = kmalloc(sizeof(struct stat));
 
     // flags checked, has to be one of the 3
     switch (whence) {
@@ -372,6 +372,8 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
             *err = EINVAL;
             return -1;
     }
+    // free the struct stat variable
+    kfree(s);
 //unlock
     // check if newpos is referencing negative
     if(newpos < 0) {
