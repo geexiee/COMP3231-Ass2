@@ -17,7 +17,7 @@
 
 
 // Initialiser function for per-process fd_table
-void init_fd_table(void) {
+int init_fd_table(void) {
     // initialising the fd_t for this process
     fd_table = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
     // initialise each value in the table to NULL
@@ -26,18 +26,26 @@ void init_fd_table(void) {
     }
 
     char c1[] = "con:";
-    int free_vnode_index = find_free_of(open_ft);
-    struct vnode **vn = &open_ft[free_vnode_index].vnode;
-    vfs_open(c1, O_WRONLY, 0, vn);
-
     char c2[] = "con:";
-    int free_vnode_index2 = find_free_of(open_ft);
-    struct vnode **vn2 = &open_ft[free_vnode_index2].vnode;
-    vfs_open(c2, O_WRONLY, 0, vn2);
+   
+    struct vnode **vn = kmalloc(sizeof(struct vnode *));
+    struct vnode **vn2 = kmalloc(sizeof(struct vnode *));
 
-    fd_table[1] = &open_ft[free_vnode_index];
-    fd_table[2] = &open_ft[free_vnode_index];
+    int ret = vfs_open(c1, O_WRONLY, 0, vn);
+    if (ret) return ret; // error checking
+    int ret2 = vfs_open(c2, O_WRONLY, 0, vn2);
+    if (ret2) return ret2; // error checking
+
+    struct of_t of1 = {0, wr, *vn};
+    struct of_t of2 = {0, wr, *vn};
+
+    open_ft[1] = of1;
+    open_ft[2] = of2;
+
+    fd_table[1] = &open_ft[1];
+    fd_table[2] = &open_ft[2];
     kprintf("\ninitialised per-process fd_t\n");
+    return 0;
 }
 
 // declare global open file table
@@ -139,7 +147,7 @@ sys_open(userptr_t filename, int flags, mode_t mode, int *err)
 
     // access and store address in vnode
     vopen = vfs_open(kfilename, flags, mode, vn);
-    if (vopen < 0) {
+    if (vopen != 0) {
         *err = ENOENT;
         return -1; //file does not exist
     }
@@ -244,8 +252,13 @@ ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err) {
 int
 sys_close(int fd, int *err) {
 
-    //return value
     int ret = 0;
+
+    if (fd >= __OPEN_MAX || fd < 0) {
+        *err = EBADF;
+        return -1;
+    }
+
     if (fd_table[fd] == NULL) {
         *err = EBADF; // if fd is not a valid file handle
         return -1;
@@ -306,7 +319,7 @@ kprintf("OLD->%d and NEW->%d are VALID FDs\n" ,oldfd, newfd);
 
 off_t
 sys_lseek(int fd, off_t offset, int whence, int *err) {
-
+    kprintf("lseek start\n");
     /* PSEUDO
     checks:
     1. load in file, check if valid
@@ -330,6 +343,7 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
             break;
         default:
             *err = EINVAL;
+            kprintf("one\n");
             return -1;
     }
 
@@ -337,6 +351,8 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     // load in file, check if valid
     if(fd_table[fd] == NULL) {
         *err = EBADF;
+        kprintf("two\n");
+
 //unlock
         return -1;
     }
@@ -348,6 +364,7 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     if(isseek < 0) {
         *err = ESPIPE; // object does not support seeking
 //unlock
+        kprintf("three\n");
         return -1;
     }
     // set position
@@ -370,6 +387,7 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
             break;
         default:
             *err = EINVAL;
+            kprintf("five\n");
             return -1;
     }
     // free the struct stat variable
@@ -378,7 +396,10 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     // check if newpos is referencing negative
     if(newpos < 0) {
         *err = EINVAL;
-        return -1;
+        kprintf("six\n");
+       return -1;
     }
+    kprintf("seven\n");
+    kprintf("newpos: %lld\n", newpos);
     return newpos;
 }
