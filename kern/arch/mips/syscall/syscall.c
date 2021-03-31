@@ -133,14 +133,18 @@ syscall(struct trapframe *tf)
 			// kprintf("CALLING READ\n");
 			retval = sys_read((int)tf->tf_a0, (void *)tf->tf_a1, (size_t)tf->tf_a2, &err);
 			break;
-		
+
 		case SYS_write:
 			// kprintf("calling syswrite\n");
 			retval = sys_write((int)tf->tf_a0, (void *)tf->tf_a1, (size_t)tf->tf_a2, &err);
 			break;
-		
+
 		case SYS_dup2:
 			retval = sys_dup2((int)tf->tf_a0, (int)tf->tf_a1, &err);
+			break;
+
+		case SYS_lseek:
+			retval = sys_lseek((int)tf->tf_a0, (off_t)tf->tf_a1, (int)tf->tf_a2, &err);
 			break;
 
 	    default:
