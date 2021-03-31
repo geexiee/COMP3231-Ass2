@@ -241,18 +241,20 @@ ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err) {
 
 
 int
-sys_close (int fd) {
+sys_close(int fd, int *err) {
 
     //return value
     int ret = 0;
     if (fd_table[fd] == NULL) {
-        return EBADF; // if fd is not a valid file handle
+        *err = EBADF; // if fd is not a valid file handle
+        return 1;
     }
 
     struct of_t *curr = fd_table[fd];
 
     if(curr->vnode == NULL) {
-        ret = EBADF; //did not close fd
+        *err = EBADF; //did not close fd
+        return -1;
     }
 
     // get the struct containing the address of the open_file
@@ -269,12 +271,13 @@ sys_close (int fd) {
 }
 
 int
-sys_dup2(int oldfd, int newfd) {
+sys_dup2(int oldfd, int newfd, int *err) {
 
 //LOCK
 //check if valid file directories
     if(fd_table[oldfd] == NULL || fd_table[newfd] == NULL) {
-        return EBADF;
+        *err = EBADF;
+        return -1;
     }
 
 kprintf("OLD->%d and NEW->%d are VALID FDs\n" ,oldfd, newfd);
@@ -285,10 +288,9 @@ kprintf("OLD->%d and NEW->%d are VALID FDs\n" ,oldfd, newfd);
     }
     // if new fd is open, then close it
     if(fd_table[newfd] != NULL) {
-        if( (sys_close(newfd) < 0) ) {
+        if( (sys_close(newfd, err)) ) {
 //UNLOCK
-
-/*ERROR*/ return  -1; // could not free file if not null
+/*ERROR*/   return  -1; // could not free file if not null
         }
     }
     // Assign the newfd the pointer to the struct holding the vnode and file pointer

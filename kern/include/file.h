@@ -55,10 +55,9 @@ int sys_open(userptr_t filename, int flags, mode_t mode, int *err);
 ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err);
 ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err);
 
+int sys_close(int fd, int *err);
 
-int sys_close (int fd);
-
-int sys_dup2(int oldfd, int newfd);
+int sys_dup2(int oldfd, int newfd, int *err);
 
 off_t lseek(int fd, off_t offset, int whence, int *err);
 
