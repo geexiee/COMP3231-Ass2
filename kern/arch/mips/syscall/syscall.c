@@ -144,7 +144,7 @@ syscall(struct trapframe *tf)
 			break;
 
 		case SYS_lseek:
-kprintf("SYS_lseek open: %d\n", (int)tf->tf_a1);
+kprintf("SYS_lseek open: %d +  %d\n", (int)tf->tf_a1, (int)tf->tf_a2);
 			retval = sys_lseek((int)tf->tf_a0, (off_t)tf->tf_a1, (int)tf->tf_a2, &err);
 kprintf("SYS_lseek open: %d\n", (int)retval);
 			break;
