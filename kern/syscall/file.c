@@ -15,6 +15,7 @@
 #include <syscall.h>
 #include <copyinout.h>
 
+
 // Initialiser function for per-process fd_table
 void init_fd_table(void) {
     // initialising the fd_t for this process
@@ -350,6 +351,8 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     newpos = curr->fp;
     oldpos = curr->fp;
 
+    struct stat *s = NULL;
+
     // flags checked, has to be one of the 3
     switch (whence) {
         case SEEK_SET:
@@ -357,15 +360,20 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
         case SEEK_CUR:
             newpos = oldpos + offset;
         case SEEK_END:
-            newpos = VOP_SEEKEND(curr->node) + offset;
+            //USE VOP_STAT to return file size, t(basically end offset of file)
+            VOP_STAT(curr->vnode, s);
+            newpos = s->st_size + offset;
+
             break;
         default:
             *err = EINVAL;
             return -1;
     }
 //unlock
+    // check if newpos is referencing negative
     if(newpos < 0) {
-        return EINVAL;
+        *err = EINVAL;
+        return -1;
     }
     return newpos;
 }
