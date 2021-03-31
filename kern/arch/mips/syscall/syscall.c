@@ -37,7 +37,8 @@
 #include <syscall.h>
 
 #include <file.h>
-
+#include <copyinout.h>
+#include <endian.h>
 /*
  * System call dispatcher.
  *
@@ -82,6 +83,11 @@ syscall(struct trapframe *tf)
 	int callno;
 	int32_t retval;
 	int err = 0;
+
+	// for lseek
+	uint64_t offset;
+	int whence;
+	off_t retval64;
 
 	// int result;
 
@@ -143,9 +149,16 @@ syscall(struct trapframe *tf)
 			break;
 
 		case SYS_lseek:
-kprintf("SYS_lseek open: %d +  %d\n", (int)tf->tf_a1, (int)tf->tf_a2);
-			retval = (int32_t) sys_lseek((int)tf->tf_a0, (off_t)tf->tf_a1, (int)tf->tf_a2, &err);
-kprintf("SYS_lseek open: %d\n", (int)retval);
+			//combine tf->tf_a0 and tf->tf_a1 for a uint_64 to be passed in
+			join32to64(tf->tf_a2, tf->tf_a3, &offset);
+
+			// input whence
+			copyin((userptr_t)tf->tf_sp + 16, &whence, sizeof(int));
+
+			retval64 = sys_lseek( (int)tf->tf_a0, offset, whence, &err);
+
+			// catch the two uint32_t and pass into v0 and v1
+			split64to32(retval64, (uint32_t *)&retval, &tf->tf_v1);
 			break;
 
 	    default:

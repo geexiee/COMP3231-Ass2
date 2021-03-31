@@ -377,8 +377,10 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     switch (whence) {
         case SEEK_SET:
             newpos = offset;
+            break;
         case SEEK_CUR:
             newpos = oldpos + offset;
+            break;
         case SEEK_END:
             //USE VOP_STAT to return file size, t(basically end offset of file)
             VOP_STAT(curr->vnode, s);
@@ -390,6 +392,8 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
             kprintf("five\n");
             return -1;
     }
+    //set new offset into table!
+    fd_table[fd]->fp += newpos;
     // free the struct stat variable
     kfree(s);
 //unlock
