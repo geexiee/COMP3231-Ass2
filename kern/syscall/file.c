@@ -311,18 +311,12 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     5. if flag is seek_end start from end VOP_SEEKEND
     6. check if negative position (EINVAL
     */
+
+    // position holders for old and new offset
     off_t newpos = 0;
     off_t oldpos = 0;
-//lock
-    // load in file, check if valid
-    if(fd_table[fd] == NULL) {
-        *err = EBADF;
-        return -1;
-    }
 
-//unlock
-
-    // check when flags
+    // check whence flag valid SEEK_SET, SEEK_CUR, SEEK_END
     switch (whence) {
         case SEEK_SET:
         case SEEK_CUR:
@@ -332,24 +326,44 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
             *err = EINVAL;
             return -1;
     }
-    struct of_t *curr = fd_table[fd];
 
+//lock
+    // load in file, check if valid
+    if(fd_table[fd] == NULL) {
+        *err = EBADF;
+//unlock
+        return -1;
+    }
+//unlock
+    struct of_t *curr = fd_table[fd];
 
     // check if VOP_ISSEEKABLE, returns <0
     int isseek = VOP_ISSEEKABLE(curr->vnode);
     if(isseek < 0) {
         *err = ESPIPE; // object does not support seeking
-
+//unlock
+        return -1;
     }
-    // check when flags
+    // set position
+    newpos = curr->fp;
+    oldpos = curr->fp;
+
+    // flags checked, has to be one of the 3
     switch (whence) {
         case SEEK_SET:
+            newpos = offset;
         case SEEK_CUR:
+            newpos = oldpos + offset;
         case SEEK_END:
+            newpos = VOP_SEEKEND(curr->node) + offset;
             break;
         default:
             *err = EINVAL;
             return -1;
     }
-
+//unlock
+    if(newpos < 0) {
+        return EINVAL;
+    }
+    return newpos;
 }
