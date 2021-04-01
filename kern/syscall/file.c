@@ -20,6 +20,8 @@
 void init_fd_table(void) {
     // initialising the fd_t for this process
     fd_table = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
+
+//LOCK
     // initialise each value in the table to NULL
     for(int i = 3; i < __OPEN_MAX; i++) {
         fd_table[i] = NULL;
@@ -37,6 +39,7 @@ void init_fd_table(void) {
 
     fd_table[1] = &open_ft[free_vnode_index];
     fd_table[2] = &open_ft[free_vnode_index];
+//UNLOCK
     kprintf("\ninitialised per-process fd_t\n");
 }
 
@@ -47,23 +50,26 @@ void create_open_ft() {
     open_ft = kmalloc(__OPEN_MAX*sizeof(struct of_t));
     // check if memory was allocated
     KASSERT(open_ft != NULL);
-
+//LOCK
     //initialise to null
     for(int i = 0; i < __OPEN_MAX; i++) {
         open_ft[i].fp = 0;
         open_ft[i].vnode = NULL;
     }
+//UNLOCK
     kprintf("Initialised global of_t\n");
 }
 
 int find_free_of(struct of_t *open_ft) {
     int ret = -1;
     // FD 0,1,2 is reserved for STDIN/STDOUT/STDERR
+//LOCK
     for(int i = 3; i < __OPEN_MAX; i++) {
         if((open_ft+i)->vnode == NULL) {
             return i;
         }
     }
+//UNLOCK
     return ret;
 }
 
