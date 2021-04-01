@@ -44,13 +44,11 @@ int init_fd_table(void) {
 
     fd_table[1] = &open_ft[1];
     fd_table[2] = &open_ft[2];
-    kprintf("\ninitialised per-process fd_t\n");
     return 0;
 }
 
 // declare global open file table
 void create_open_ft() {
-    kprintf("Trying to initialise global of_t\n");
     // only runs if open_ft == NULL;
     open_ft = kmalloc(__OPEN_MAX*sizeof(struct of_t));
     // check if memory was allocated
@@ -61,7 +59,6 @@ void create_open_ft() {
         open_ft[i].fp = 0;
         open_ft[i].vnode = NULL;
     }
-    kprintf("Initialised global of_t\n");
 }
 
 int find_free_of(struct of_t *open_ft) {
@@ -149,7 +146,6 @@ sys_open(userptr_t filename, int flags, mode_t mode, int *err)
         return -1; //file does not exist
     }
 
-
     // assign values to the corresponding of_t entry
     open_ft[free_of].fp = 0;
     open_ft[free_of].vnode = *vn;
@@ -168,15 +164,7 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
     off_t fp = -1;
     int flag = -1;
     struct vnode *vn = NULL;
-//lock
-    // struct stat *s = kmalloc(sizeof(struct stat));
-    // VOP_STAT(of->vnode, s);
-    // if( ((long int)of->fp + (long int)buflen) >= s->st_size) {
-    //     *err = EFAULT;
-    //     return -1;
-    // }
-    // kfree(s);
-//unlock
+
     if (of == NULL) {
         *err = EBADF;
         return -1;
@@ -188,7 +176,7 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
 
     if (flag != rdwr && flag != rd) {
         *err = EBADF;
-        return -1;
+        return -1;   
     }
 
     if (buf == NULL) {
@@ -198,7 +186,6 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
 
     struct iovec iov;
     struct uio u;
-
     uio_kinit(&iov, &u, buf, buflen, fp, UIO_READ); // initialising the iovec and uio to use in vop_read
 
     int result = VOP_READ(vn, &u);
@@ -207,9 +194,9 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
         return -1;
     }
 
-    ssize_t bytes_read = buflen - u.uio_resid;
+    off_t bytes_read = buflen - u.uio_resid;
     of->fp = bytes_read;
-
+    
     return bytes_read;
 }
 
@@ -220,7 +207,6 @@ ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err) {
     struct vnode *vn = NULL;
 
     if (of == NULL) {
-        kprintf("of = NULL, fd is %d\n", fd);
         *err = EBADF;
         return -1;
     } else {
@@ -229,7 +215,6 @@ ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err) {
     }
 
     if (buf == NULL) {
-        kprintf("buffer we're writing from is null\n");
         *err = EFAULT;
         return -1;
     }
@@ -242,11 +227,10 @@ ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err) {
     int result = VOP_WRITE(vn, &u);
     if (result != 0) {
         *err = result;
-        kprintf("fucked up the vop_write\n");
         return -1;
     }
 
-    int bytes_written = nbytes - u.uio_resid;
+    off_t bytes_written = nbytes - u.uio_resid;
     of->fp = bytes_written;
 
     return bytes_written;
@@ -256,7 +240,6 @@ ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err) {
 
 int
 sys_close(int fd, int *err) {
-
     int ret = 0;
 
     if (fd >= __OPEN_MAX || fd < 0) {
@@ -290,7 +273,7 @@ sys_close(int fd, int *err) {
 }
 
 int
-sys_dup2(int oldfd, int newfd, int *err) {  // WORKING FOR 2 OPEN FILES, STILL NEED TO TEST WITH CLOSED FILE
+sys_dup2(int oldfd, int newfd, int *err) {  
 
 //LOCK
 //check if valid file directories
@@ -324,17 +307,6 @@ kprintf("OLD->%d and NEW->%d are VALID FDs\n" ,oldfd, newfd);
 
 off_t
 sys_lseek(int fd, off_t offset, int whence, int *err) {
-    /* PSEUDO
-    checks:
-    1. load in file, check if valid
-    2. check if you have seek permissions -> VOP_ISSEEKABLE
-    3. check flags valid -> fail otherwise
-    3. --
-    4. based on flag we increment offset
-    5. if flag is seek_end start from end VOP_SEEKEND
-    6. check if negative position (EINVAL
-    */
-
     // position holders for old and new offset
     off_t newpos = 0;
     off_t oldpos = 0;
@@ -354,8 +326,12 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     // load in file, check if valid
     if(fd_table[fd] == NULL) {
         *err = EBADF;
-
 //unlock
+        return -1;
+    }
+    // Accessing STDIN should give ESPIPE (unseekable)
+    if(fd == 0) {
+        *err = ESPIPE;
         return -1;
     }
 //unlock
@@ -363,7 +339,7 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
 
     // check if VOP_ISSEEKABLE, returns <0
     int isseek = VOP_ISSEEKABLE(curr->vnode);
-    if(isseek < 0) {
+    if(!isseek) {
         *err = ESPIPE; // object does not support seeking
 //unlock
         return -1;
@@ -393,8 +369,7 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
             return -1;
     }
     //set new offset into table!
-    fd_table[fd]->fp += newpos;
-    // free the struct stat variable
+    fd_table[fd]->fp = newpos;
     kfree(s);
 //unlock
     // check if newpos is referencing negative
