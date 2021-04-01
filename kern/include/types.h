@@ -152,11 +152,4 @@ typedef _Bool bool;
 #define true  1
 #define false 0
 
-/*
- * Flags
- */
-#define rd 0
-#define wr 1
-#define rdwr 2
-
 #endif /* _TYPES_H_ */

@@ -36,14 +36,15 @@ int init_fd_table(void) {
     int ret2 = vfs_open(c2, O_WRONLY, 0, vn2);
     if (ret2) return ret2; // error checking
 
-    struct of_t of1 = {0, wr, *vn};
-    struct of_t of2 = {0, wr, *vn};
+    struct of_t of1 = {O_WRONLY, 0, *vn};
+    struct of_t of2 = {O_WRONLY, 0, *vn};
 
     open_ft[1] = of1;
     open_ft[2] = of2;
 
     fd_table[1] = &open_ft[1];
     fd_table[2] = &open_ft[2];
+    kprintf("flag is %d\n", of1.flag);
     return 0;
 }
 
@@ -104,13 +105,13 @@ sys_open(userptr_t filename, int flags, mode_t mode, int *err)
     //check the flag mode
     switch (flags & O_ACCMODE) {
 	case O_RDONLY:
-		flag = rd;
+		flag = O_RDONLY;
 		break;
 	case O_WRONLY:
-		flag = wr;
+		flag = O_WRONLY;
 		break;
 	case O_RDWR:
-        flag = rdwr;
+        flag = O_RDWR;
 		break;
 	default:
         // invalid flag input
@@ -174,7 +175,7 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
         fp = of->fp;
     }
 
-    if (flag != rdwr && flag != rd) {
+    if (flag != O_RDWR && flag != O_RDONLY) {
         *err = EBADF;
         return -1;   
     }
@@ -213,10 +214,11 @@ ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err) {
     } else {
         vn = of->vnode;
         fp = of->fp;
-        flag = of->flag;
+        flag = of->flag; 
     }
 
-    if (flag != rdwr && flag != wr) {
+    if (flag != O_RDWR && flag != O_WRONLY) {
+        kprintf("%d\n",flag);
         *err = EBADF;
         return -1;   
     }
