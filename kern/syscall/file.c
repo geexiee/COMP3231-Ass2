@@ -44,7 +44,6 @@ int init_fd_table(void) {
 
     fd_table[1] = &open_ft[1];
     fd_table[2] = &open_ft[2];
-    kprintf("flag is %d\n", of1.flag);
     return 0;
 }
 
@@ -218,7 +217,6 @@ ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err) {
     }
 
     if (flag != O_RDWR && flag != O_WRONLY) {
-        kprintf("%d\n",flag);
         *err = EBADF;
         return -1;   
     }
@@ -291,25 +289,21 @@ sys_dup2(int oldfd, int newfd, int *err) {
         return -1;
     }
 
-kprintf("OLD->%d and NEW->%d are VALID FDs\n" ,oldfd, newfd);
 
     // check if dup2 calls pass in the same fd
     if(oldfd == newfd) {
-        kprintf("old fd = new fd\n");
         return oldfd;
     }
     // if new fd is open, then close it
     if(fd_table[newfd] != NULL) {
         if( (sys_close(newfd, err)) ) {
 //UNLOCK    
-            kprintf("couldn't close\n");
 /*ERROR*/   return  -1; // could not free file if not null
         }
     }
     // Assign the newfd the pointer to the struct holding the vnode and file pointer
     fd_table[newfd] = fd_table[oldfd];
 //UNLOCK
-    kprintf("new fd addr: %p old fd addr: %p\n", fd_table[newfd], fd_table[oldfd]);
     return newfd;
 }
 
