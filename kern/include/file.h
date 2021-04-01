@@ -9,8 +9,25 @@
  * Contains some file-related maximum length constants
  */
 #include <limits.h>
-#include <vnode.h>
-#include <types.h>
+
+/*
+ * Put your function declarations and data types here ...
+ */
+
+// only instance of the global open_file_table
+// struct of_t open_ft[__OPEN_MAX];
+
+
+ /* FD Table - array of pointers
+ - Each entry holds the address of the OF Entries
+
+ struct of_t **fd_t[] = kmalloc(sizeof(...*maxthing));
+
+ // OF Table - array of structs (contains a pointer and offset off_t fp)
+
+ struct of_t *open_ft = kmalloc(sizeof(...*maxthing))
+
+ */
 
 // The fd_t for the process, an array of pointers to of entries
 #define fd_table (curthread->t_proc->fd_t)
@@ -26,8 +43,7 @@ struct of_t {
 struct of_t *open_ft;
 
 // Initialiser function for per-process fd_table
-//int
-void init_fd_table(void);
+int init_fd_table(void);
 // initialise global open file table
 void create_open_ft(void);
 // find free of
@@ -46,6 +62,7 @@ int sys_dup2(int oldfd, int newfd, int *err);
 
 off_t sys_lseek(int fd, off_t offset, int whence, int *err);
 
-// int sys_open(const char *filename, int flags, mode_t mode, int *retval);
+
+
 
 #endif /* _FILE_H_ */

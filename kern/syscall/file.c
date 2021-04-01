@@ -17,30 +17,35 @@
 
 
 // Initialiser function for per-process fd_table
-void init_fd_table(void) {
+int init_fd_table(void) {
     // initialising the fd_t for this process
     fd_table = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
-
-//LOCK
     // initialise each value in the table to NULL
     for(int i = 3; i < __OPEN_MAX; i++) {
         fd_table[i] = NULL;
     }
 
     char c1[] = "con:";
-    int free_vnode_index = find_free_of(open_ft);
-    struct vnode **vn = &open_ft[free_vnode_index].vnode;
-    vfs_open(c1, O_WRONLY, 0, vn);
-
     char c2[] = "con:";
-    int free_vnode_index2 = find_free_of(open_ft);
-    struct vnode **vn2 = &open_ft[free_vnode_index2].vnode;
-    vfs_open(c2, O_WRONLY, 0, vn2);
+   
+    struct vnode **vn = kmalloc(sizeof(struct vnode *));
+    struct vnode **vn2 = kmalloc(sizeof(struct vnode *));
 
-    fd_table[1] = &open_ft[free_vnode_index];
-    fd_table[2] = &open_ft[free_vnode_index];
-//UNLOCK
+    int ret = vfs_open(c1, O_WRONLY, 0, vn);
+    if (ret) return ret; // error checking
+    int ret2 = vfs_open(c2, O_WRONLY, 0, vn2);
+    if (ret2) return ret2; // error checking
+
+    struct of_t of1 = {0, wr, *vn};
+    struct of_t of2 = {0, wr, *vn};
+
+    open_ft[1] = of1;
+    open_ft[2] = of2;
+
+    fd_table[1] = &open_ft[1];
+    fd_table[2] = &open_ft[2];
     kprintf("\ninitialised per-process fd_t\n");
+    return 0;
 }
 
 // declare global open file table
@@ -50,39 +55,34 @@ void create_open_ft() {
     open_ft = kmalloc(__OPEN_MAX*sizeof(struct of_t));
     // check if memory was allocated
     KASSERT(open_ft != NULL);
-//LOCK
+
     //initialise to null
     for(int i = 0; i < __OPEN_MAX; i++) {
         open_ft[i].fp = 0;
         open_ft[i].vnode = NULL;
     }
-//UNLOCK
     kprintf("Initialised global of_t\n");
 }
 
 int find_free_of(struct of_t *open_ft) {
     int ret = -1;
     // FD 0,1,2 is reserved for STDIN/STDOUT/STDERR
-//LOCK
     for(int i = 3; i < __OPEN_MAX; i++) {
         if((open_ft+i)->vnode == NULL) {
             return i;
         }
     }
-//UNLOCK
     return ret;
 }
 
 int find_free_fd(struct of_t **fd_t) {
     int ret = -1;
     // FD 0,1,2 is reserved for STDIN/STDOUT/STDERR
-//LOCK
     for(int i = 3; i < __OPEN_MAX; i++) {
         if(fd_t[i] == NULL) {
             return i;
         }
     }
-//UNLOCK
     return ret;
 }
 
@@ -130,9 +130,6 @@ sys_open(userptr_t filename, int flags, mode_t mode, int *err)
     }
 
     free_of = find_free_of(open_ft);
-
-
-    free_of = find_free_of(open_ft);
     if(free_of < 0) {
         *err = ENFILE;
         return -1; //global-open file table is full
@@ -147,7 +144,7 @@ sys_open(userptr_t filename, int flags, mode_t mode, int *err)
 
     // access and store address in vnode
     vopen = vfs_open(kfilename, flags, mode, vn);
-    if (vopen < 0) {
+    if (vopen != 0) {
         *err = ENOENT;
         return -1; //file does not exist
     }
@@ -158,10 +155,8 @@ sys_open(userptr_t filename, int flags, mode_t mode, int *err)
     open_ft[free_of].vnode = *vn;
     open_ft[free_of].flag = flag;
 
-//LOCK
     // make the fd point to the of_table
     fd_table[free_fd] = &open_ft[free_of];
-//UNLOCK
 
     return free_fd;
 }
@@ -173,7 +168,15 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
     off_t fp = -1;
     int flag = -1;
     struct vnode *vn = NULL;
-
+//lock
+    // struct stat *s = kmalloc(sizeof(struct stat));
+    // VOP_STAT(of->vnode, s);
+    // if( ((long int)of->fp + (long int)buflen) >= s->st_size) {
+    //     *err = EFAULT;
+    //     return -1;
+    // }
+    // kfree(s);
+//unlock
     if (of == NULL) {
         *err = EBADF;
         return -1;
@@ -200,10 +203,10 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
 
     int result = VOP_READ(vn, &u);
     if (result != 0) {
-        kprintf("fucked up the vop_read");
         *err = result;
         return -1;
     }
+
     ssize_t bytes_read = buflen - u.uio_resid;
     of->fp = bytes_read;
 
@@ -254,11 +257,16 @@ ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err) {
 int
 sys_close(int fd, int *err) {
 
-    //return value
     int ret = 0;
+
+    if (fd >= __OPEN_MAX || fd < 0) {
+        *err = EBADF;
+        return -1;
+    }
+
     if (fd_table[fd] == NULL) {
         *err = EBADF; // if fd is not a valid file handle
-        return 1;
+        return -1;
     }
 
     struct of_t *curr = fd_table[fd];
@@ -282,7 +290,7 @@ sys_close(int fd, int *err) {
 }
 
 int
-sys_dup2(int oldfd, int newfd, int *err) {
+sys_dup2(int oldfd, int newfd, int *err) {  // WORKING FOR 2 OPEN FILES, STILL NEED TO TEST WITH CLOSED FILE
 
 //LOCK
 //check if valid file directories
@@ -295,25 +303,27 @@ kprintf("OLD->%d and NEW->%d are VALID FDs\n" ,oldfd, newfd);
 
     // check if dup2 calls pass in the same fd
     if(oldfd == newfd) {
+        kprintf("old fd = new fd\n");
         return oldfd;
     }
     // if new fd is open, then close it
     if(fd_table[newfd] != NULL) {
         if( (sys_close(newfd, err)) ) {
-//UNLOCK
+//UNLOCK    
+            kprintf("couldn't close\n");
 /*ERROR*/   return  -1; // could not free file if not null
         }
     }
     // Assign the newfd the pointer to the struct holding the vnode and file pointer
     fd_table[newfd] = fd_table[oldfd];
 //UNLOCK
+    kprintf("new fd addr: %p old fd addr: %p\n", fd_table[newfd], fd_table[oldfd]);
     return newfd;
 }
 
 
 off_t
 sys_lseek(int fd, off_t offset, int whence, int *err) {
-
     /* PSEUDO
     checks:
     1. load in file, check if valid
@@ -344,6 +354,7 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     // load in file, check if valid
     if(fd_table[fd] == NULL) {
         *err = EBADF;
+
 //unlock
         return -1;
     }
@@ -389,7 +400,7 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     // check if newpos is referencing negative
     if(newpos < 0) {
         *err = EINVAL;
-        return -1;
+       return -1;
     }
     return newpos;
 }

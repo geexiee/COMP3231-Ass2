@@ -99,11 +99,9 @@ runprogram(char *progname)
 	}
 
 	// Initialise fd_t for this process
-	// if (init_fd_table() != 0) {
-	// 	return -1; // error
-	// }
-	init_fd_table();
-
+	if (init_fd_table() != 0) {
+		return -1; // error
+	}
 	/* Warp to user mode. */
 	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
@@ -113,3 +111,4 @@ runprogram(char *progname)
 	panic("enter_new_process returned\n");
 	return EINVAL;
 }
+
