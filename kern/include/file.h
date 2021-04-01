@@ -43,7 +43,7 @@ struct of_t {
 struct of_t *open_ft;
 
 // Initialiser function for per-process fd_table
-void init_fd_table(void);
+int init_fd_table(void);
 // initialise global open file table
 void create_open_ft(void);
 // find free of

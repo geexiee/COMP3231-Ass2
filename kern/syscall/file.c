@@ -76,11 +76,13 @@ int find_free_of(struct of_t *open_ft) {
 int find_free_fd(struct of_t **fd_t) {
     int ret = -1;
     // FD 0,1,2 is reserved for STDIN/STDOUT/STDERR
+//LOCK
     for(int i = 3; i < __OPEN_MAX; i++) {
         if(fd_t[i] == NULL) {
             return i;
         }
     }
+//UNLOCK
     return ret;
 }
 
@@ -156,8 +158,10 @@ sys_open(userptr_t filename, int flags, mode_t mode, int *err)
     open_ft[free_of].vnode = *vn;
     open_ft[free_of].flag = flag;
 
+//LOCK
     // make the fd point to the of_table
     fd_table[free_fd] = &open_ft[free_of];
+//UNLOCK
 
     return free_fd;
 }
