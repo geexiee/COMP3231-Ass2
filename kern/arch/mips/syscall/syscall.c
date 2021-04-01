@@ -134,6 +134,7 @@ syscall(struct trapframe *tf)
 			retval = sys_close((int)tf->tf_a0, &err);
 			break;
 
+<<<<<<< HEAD
 		case SYS_read:
 			kprintf("CALLING READ\n");
 			retval = sys_read((int)tf->tf_a0, (void *)tf->tf_a1, (size_t)tf->tf_a2, &err);
@@ -161,6 +162,18 @@ syscall(struct trapframe *tf)
 			split64to32(retval64, (uint32_t *)&retval, &tf->tf_v1);
 			break;
 
+=======
+		case SYS_open:
+			kprintf("trying to call sys_open\n");
+			// err = sys_open((userptr_t)tf->tf_a0, tf->tf_a1, tf->tf_a2, &retval);
+			// call sys_open implementation
+
+		case SYS_write:
+			kprintf("trying to call sys_write\n");
+		
+	    /* Add stuff here */
+		
+>>>>>>> 67532f7f317068e6084d3e4aa6c3e514e00a867d
 	    default:
 			kprintf("Unknown syscall %d\n", callno);
 			break;
