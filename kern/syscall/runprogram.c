@@ -102,8 +102,8 @@ runprogram(char *progname)
 	// if (init_fd_table() != 0) {
 	// 	return -1; // error
 	// }
-	init_fd_table()
-	
+	init_fd_table();
+
 	/* Warp to user mode. */
 	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
