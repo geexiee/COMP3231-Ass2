@@ -203,6 +203,7 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
 // sys write
 ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err) {
     struct of_t *of = fd_table[fd];
+    int flag = -1;
     off_t fp = -1;
     struct vnode *vn = NULL;
 
@@ -212,6 +213,12 @@ ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err) {
     } else {
         vn = of->vnode;
         fp = of->fp;
+        flag = of->flag;
+    }
+
+    if (flag != rdwr && flag != wr) {
+        *err = EBADF;
+        return -1;   
     }
 
     if (buf == NULL) {
