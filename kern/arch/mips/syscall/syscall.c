@@ -125,7 +125,7 @@ syscall(struct trapframe *tf)
 
 
 		//open function here
-		case SYS_open:			// const char,         int,                 mode
+		case SYS_open:			
 			retval = sys_open( (userptr_t)tf->tf_a0, (int)tf->tf_a1, (mode_t)tf->tf_a2, &err );
 			break;
 
@@ -135,12 +135,10 @@ syscall(struct trapframe *tf)
 			break;
 
 		case SYS_read:
-			kprintf("CALLING READ\n");
 			retval = sys_read((int)tf->tf_a0, (void *)tf->tf_a1, (size_t)tf->tf_a2, &err);
 			break;
 
 		case SYS_write:
-			// kprintf("calling syswrite\n");
 			retval = sys_write((int)tf->tf_a0, (void *)tf->tf_a1, (size_t)tf->tf_a2, &err);
 			break;
 
@@ -173,13 +171,11 @@ syscall(struct trapframe *tf)
 		 * userlevel to a return value of -1 and the error
 		 * code in errno.
 		 */
-		kprintf("there was an error in the call, errno: %d\n", err);
 		tf->tf_v0 = err;
 		tf->tf_a3 = 1;      /* signal an error */
 	}
 	else {
 		/* Success. */
-		// kprintf("call was successful\n");
 		tf->tf_v0 = retval;
 		tf->tf_a3 = 0;      /* signal no error */
 	}
