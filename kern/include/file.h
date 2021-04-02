@@ -26,6 +26,9 @@ int init_fd_table(void);
 void create_open_ft(void);
 int find_free_of(struct of_t *open_ft);
 int find_free_fd(struct of_t **fd_t);
+void destroy_fd_table(void);
+void destroy_open_ft(void);
+
 
 // syscalls
 int sys_open(userptr_t filename, int flags, mode_t mode, int *err);
@@ -34,5 +37,6 @@ ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err);
 int sys_close (int fd, int *err);
 int sys_dup2(int oldfd, int newfd, int *err);
 off_t sys_lseek(int fd, off_t offset, int whence, int *err);
+
 
 #endif /* _FILE_H_ */

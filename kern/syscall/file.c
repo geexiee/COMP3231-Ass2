@@ -15,75 +15,6 @@
 #include <syscall.h>
 #include <copyinout.h>
 
-
-// Initialiser function for per-process fd_table
-int init_fd_table(void) {
-    // initialising the fd_t for this process
-    fd_table = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
-    // initialise each value in the table to NULL
-    for(int i = 3; i < __OPEN_MAX; i++) {
-        fd_table[i] = NULL;
-    }
-
-    char c1[] = "con:";
-    char c2[] = "con:";
-   
-    struct vnode **vn = kmalloc(sizeof(struct vnode *));
-    struct vnode **vn2 = kmalloc(sizeof(struct vnode *));
-
-    int ret = vfs_open(c1, O_WRONLY, 0, vn);
-    if (ret) return ret; // error checking
-    int ret2 = vfs_open(c2, O_WRONLY, 0, vn2);
-    if (ret2) return ret2; // error checking
-
-    struct of_t of1 = {O_WRONLY, 0, *vn};
-    struct of_t of2 = {O_WRONLY, 0, *vn};
-
-    open_ft[1] = of1;
-    open_ft[2] = of2;
-
-    fd_table[1] = &open_ft[1];
-    fd_table[2] = &open_ft[2];
-    return 0;
-}
-
-// declare global open file table
-void create_open_ft() {
-    // only runs if open_ft == NULL;
-    open_ft = kmalloc(__OPEN_MAX*sizeof(struct of_t));
-    // check if memory was allocated
-    KASSERT(open_ft != NULL);
-
-    //initialise to null
-    for(int i = 0; i < __OPEN_MAX; i++) {
-        open_ft[i].fp = 0;
-        open_ft[i].vnode = NULL;
-    }
-}
-
-int find_free_of(struct of_t *open_ft) {
-    int ret = -1;
-    // FD 0,1,2 is reserved for STDIN/STDOUT/STDERR
-    for(int i = 3; i < __OPEN_MAX; i++) {
-        if((open_ft+i)->vnode == NULL) {
-            return i;
-        }
-    }
-    return ret;
-}
-
-int find_free_fd(struct of_t **fd_t) {
-    int ret = -1;
-    // FD 0,1,2 is reserved for STDIN/STDOUT/STDERR
-    for(int i = 3; i < __OPEN_MAX; i++) {
-        if(fd_t[i] == NULL) {
-            return i;
-        }
-    }
-    return ret;
-}
-
-
 //Basic structure of syscall
 int
 sys_open(userptr_t filename, int flags, mode_t mode, int *err)
@@ -165,6 +96,7 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
     int flag = -1;
     struct vnode *vn = NULL;
 
+    // check if file pointer points to valid open file
     if (of == NULL) {
         *err = EBADF;
         return -1;
@@ -174,9 +106,10 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
         fp = of->fp;
     }
 
+    // handle and check flags
     if (flag != O_RDWR && flag != O_RDONLY) {
         *err = EBADF;
-        return -1;   
+        return -1;
     }
 
     if (buf == NULL) {
@@ -188,6 +121,7 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
     struct uio u;
     uio_kinit(&iov, &u, buf, buflen, fp, UIO_READ); // initialising the iovec and uio to use in vop_read
 
+    // Pass into u
     int result = VOP_READ(vn, &u);
     if (result != 0) {
         *err = result;
@@ -196,7 +130,7 @@ ssize_t sys_read(int fd, void *buf, size_t buflen, ssize_t *err) {
 
     off_t bytes_read = buflen - u.uio_resid;
     of->fp = bytes_read;
-    
+
     return bytes_read;
 }
 
@@ -213,12 +147,12 @@ ssize_t sys_write(int fd, void *buf, size_t nbytes, ssize_t *err) {
     } else {
         vn = of->vnode;
         fp = of->fp;
-        flag = of->flag; 
+        flag = of->flag;
     }
 
     if (flag != O_RDWR && flag != O_WRONLY) {
         *err = EBADF;
-        return -1;   
+        return -1;
     }
 
     if (buf == NULL) {
@@ -270,19 +204,17 @@ sys_close(int fd, int *err) {
     // Pass the vnode in to close open file
     vfs_close(curr->vnode);
 
-// LOCK so count is consistent
     // close open file for the fd
     curr->fp = 0;
     curr->vnode = NULL;
     fd_table[fd] = NULL;
-// UNLOCK
+
     return ret;
 }
 
 int
-sys_dup2(int oldfd, int newfd, int *err) {  
+sys_dup2(int oldfd, int newfd, int *err) {
 
-//LOCK
 //check if valid file directories
     if(fd_table[oldfd] == NULL || fd_table[newfd] == NULL) {
         *err = EBADF;
@@ -297,13 +229,13 @@ sys_dup2(int oldfd, int newfd, int *err) {
     // if new fd is open, then close it
     if(fd_table[newfd] != NULL) {
         if( (sys_close(newfd, err)) ) {
-//UNLOCK    
+
 /*ERROR*/   return  -1; // could not free file if not null
         }
     }
     // Assign the newfd the pointer to the struct holding the vnode and file pointer
     fd_table[newfd] = fd_table[oldfd];
-//UNLOCK
+
     return newfd;
 }
 
@@ -325,11 +257,9 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
             return -1;
     }
 
-//lock
     // load in file, check if valid
     if(fd_table[fd] == NULL) {
         *err = EBADF;
-//unlock
         return -1;
     }
     // Accessing STDIN should give ESPIPE (unseekable)
@@ -337,14 +267,13 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
         *err = ESPIPE;
         return -1;
     }
-//unlock
+
     struct of_t *curr = fd_table[fd];
 
-    // check if VOP_ISSEEKABLE, returns <0
+    // check if VOP_ISSEEKABLE, returns error for non-seekable object
     int isseek = VOP_ISSEEKABLE(curr->vnode);
     if(!isseek) {
         *err = ESPIPE; // object does not support seeking
-//unlock
         return -1;
     }
     // set position
@@ -362,7 +291,7 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
             newpos = oldpos + offset;
             break;
         case SEEK_END:
-            //USE VOP_STAT to return file size, t(basically end offset of file)
+            //USE VOP_STAT to return file size, (the end offset of file)
             VOP_STAT(curr->vnode, s);
             newpos = s->st_size + offset;
 
@@ -374,11 +303,107 @@ sys_lseek(int fd, off_t offset, int whence, int *err) {
     //set new offset into table!
     fd_table[fd]->fp = newpos;
     kfree(s);
-//unlock
+
     // check if newpos is referencing negative
     if(newpos < 0) {
         *err = EINVAL;
        return -1;
     }
     return newpos;
+}
+
+/*Helper functions for creating/designing the OF and per process FD*/
+
+// Initialiser function for per-process fd_table
+int init_fd_table(void) {
+    // initialising the fd_t for this process
+    fd_table = kmalloc(__OPEN_MAX*sizeof(struct of_t *));
+
+    //check if table is created
+    if(fd_table == NULL) {
+        return -1;
+    }
+
+    // initialise each value in the table to NULL
+    for(int i = 3; i < __OPEN_MAX; i++) {
+        fd_table[i] = NULL;
+    }
+
+    char c1[] = "con:";
+    char c2[] = "con:";
+
+    struct vnode **vn = kmalloc(sizeof(struct vnode *));
+    struct vnode **vn2 = kmalloc(sizeof(struct vnode *));
+
+    int ret = vfs_open(c1, O_WRONLY, 0, vn);
+    if (ret) return ret; // error checking
+    int ret2 = vfs_open(c2, O_WRONLY, 0, vn2);
+    if (ret2) return ret2; // error checking
+
+    struct of_t of1 = {O_WRONLY, 0, *vn};
+    struct of_t of2 = {O_WRONLY, 0, *vn};
+
+    open_ft[1] = of1;
+    open_ft[2] = of2;
+
+    fd_table[1] = &open_ft[1];
+    fd_table[2] = &open_ft[2];
+    return 0;
+}
+
+void destroy_fd_table() {
+    //check if fd_t is null
+    if(fd_table != NULL) {
+        kfree(fd_table);
+    }
+}
+
+int find_free_fd(struct of_t **fd_t) {
+    int ret = -1;
+    // FD 0,1,2 is reserved for STDIN/STDOUT/STDERR
+    for(int i = 3; i < __OPEN_MAX; i++) {
+        if(fd_t[i] == NULL) {
+            return i;
+        }
+    }
+    return ret;
+}
+
+// declare global open file table
+void create_open_ft() {
+    // only runs if open_ft == NULL;
+    open_ft = kmalloc(__OPEN_MAX*sizeof(struct of_t));
+    // check if memory was allocated
+    KASSERT(open_ft != NULL);
+
+    //initialise to null
+    for(int i = 0; i < __OPEN_MAX; i++) {
+        open_ft[i].fp = 0;
+        open_ft[i].vnode = NULL;
+    }
+}
+
+void destroy_open_ft() {
+    //check if open_ft is null
+    if(open_ft != NULL) {
+
+        // free all the vnodes inside open file table before freeing array
+        for(int i = 0; i < __OPEN_MAX; i++) {
+            if(open_ft->vnode != NULL) {
+                vfs_close(open_ft->vnode);
+            }
+        }
+        kfree(open_ft);
+    }
+}
+
+int find_free_of(struct of_t *open_ft) {
+    int ret = -1;
+    // FD 0,1,2 is reserved for STDIN/STDOUT/STDERR
+    for(int i = 3; i < __OPEN_MAX; i++) {
+        if((open_ft+i)->vnode == NULL) {
+            return i;
+        }
+    }
+    return ret;
 }
