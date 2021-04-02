@@ -215,7 +215,7 @@ sys_close(int fd, int *err) {
 int
 sys_dup2(int oldfd, int newfd, int *err) {
 
-//check if valid file directories
+//check if valid file descriptors
     if(fd_table[oldfd] == NULL || fd_table[newfd] == NULL) {
         *err = EBADF;
         return -1;

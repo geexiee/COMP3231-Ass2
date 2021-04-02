@@ -22,11 +22,11 @@ struct of_t {
 
 // array of open files (global ft), initialised in main
 struct of_t *open_ft;
-int init_fd_table(void); // initialise per process file-directory table
+int init_fd_table(void); // initialise per process file-descriptor table
 void create_open_ft(void); // initialise global open-files table
 int find_free_of(struct of_t *open_ft); // find next free open file slot in table
 int find_free_fd(struct of_t **fd_t); // find next free fd slot in table
-void destroy_fd_table(void); // shutdown per process file-directory table
+void destroy_fd_table(void); // shutdown per process file-descriptor table
 void destroy_open_ft(void); // shutdown global open-files table
 
 
