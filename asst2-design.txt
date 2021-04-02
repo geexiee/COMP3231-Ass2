@@ -1,1 +1,38 @@
 Add your design document in here.
+
+
+Group 297 ASST2 - z5160618 and z5209666
+
+Key:
+fd_table - the per-process file descriptor table.
+open_ft - the global open file table (shared between processes)
+VFS - Virtual File System
+
+To begin the assignment we needed to understand the layers of file management in UNIX, specifically from the user-level system calls to be interpreted by creating a PER-PROCESS File-Descriptor-Table (fd_table), the global-open-file-table (open_ft) and using the Virtual-File System (VFS). Following the lectures, we wanted to use the fd_table to provide pointers to the open_ft, allowing each process to have multiple file descriptors which could still point to the same open file and vnode. We had to consider the different ways that these tables could be represented, mainly choosing between representing them as a linked-list for space efficiency or an array for simplicity. We ultimately opted for the array as it was a structure we were familiar with and was still suitable in the scope of this assignment, particularly when looking for free table entries or assigning specific ones. Through considering all these factors, we were able to implement the indirection layers between the userland calls and the kernel system calls to provide these basic system calls to users.
+
+
+Structures we used:
+We defined our structs in file.h. and the structures are used in file.c (and helper functions)
+
+The open_ft was defined as an array of structs named “of_t” which each represented an open file. Of_t was defined with 3 variables: int flag, off_t fp, and struct vnode *vnode. Flag was used to identify the permissions associated with the file. Possible values for this included O_RDONLY (0), O_WRONLY (1) and O_RDWR (2) which were defined in fcntl.h for readability. Fp represented the filepointer, and vnode represented a pointer to a vnode stored in the VFS which accessed the file itself. The open_ft was initialised in main.c so that there was just 1 global open_ft for all processes.
+
+The fd_table was defined as an array of pointers to of_t’s (open files) each element. Since this was designed such that each process had it’s own table, we chose to define it in proc.h as a variable contained within the proc struct. We also chose to initialise it in runprogram.c so that whenever a new process is created, it created a new fd_t. When the system shuts down this would destroy any processes (fd_t) and the global open file table.
+
+Before destroying the open file table, it would use VFS operation vfs_close all the vnodes that are open.
+Issues: By using an array, the size of the per-process file descriptors instead of using dynamic structures like a linked list will have its limits as we used __OPEN_MAX to define the max allocation of files and fd 0,1 and 2 is reserved for STDIN, STDOUT and STDERR.
+
+The File director table (fd_table) is the per-process array that points to an open file table when initialised and the global open file table is the shared global array that holds the file pointer and vnode to connect the kernel level (INODEs).
+
+Transferring data had issues such as updating the file-pointer of a file at the correct index when one or more file descriptors are attached to it or editing at the same time with sys_write. Other issues include reading the end of file, where the fp should point to the offset at the end of the file. And below:
+
+Issues
+A key issue was managing access to the open_ft. For the scope of the testing, we were told to assume that only one process would be running at a time, but we still needed to account for several processes running at the same time (as though fork() was implemented). This meant there existed the possibility of multiple processes trying to access the open_ft at the same time, creating issues in managing the state of the file. To manage this, we utilised locks when a process tried to access the open_ft to maintain a mutual exclusion zone. (However Kevin explained in the basic assignment locks should not be used.)
+
+Another issue we initially faced was the best way to find empty/free file pointers. We initially considered keeping a global count but realised that would cause issues concurrency regarding sharing the count between processes and create problems when opening/closing new files. We decided to then use a simple loop which found the first null value in each table and returned that as the free file pointer. These loops were implemented through the functions find_free_of() and find_free_fd().
+
+We also had to consider what information we wanted to store in our open files (of_t). We were certain of keeping the vnode and filepointer from the start, but later realised we needed to store flags as well so that we could check read/write permissions on opened files.These permissions were stored after checking if the call was successful and the flags were valid.
+
+Error handling was important as this told the user-level the type of error encountered and was more robust than crashing the OS. We implemented the error handling based on the manual.
+
+Functions:
+Sys_open, sys_close, sys_read, sys_write, sys_dup2, sys_lseek.
